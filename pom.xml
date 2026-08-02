@@ -32,6 +32,7 @@
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
         <minio.version>8.5.17</minio.version>
         <jjwt.version>0.12.6</jjwt.version>
+        <wx-java.version>4.8.3.B</wx-java.version>
     </properties>
 
     <dependencyManagement>
@@ -99,6 +100,14 @@
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-all</artifactId>
                 <version>5.8.20</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.binarywang</groupId>
+                <artifactId>wx-java-bom</artifactId>
+                <version>${wx-java.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
