@@ -1,0 +1,114 @@
+package ${packageName}.controller;
+
+import java.util.List;
+
+import lombok.RequiredArgsConstructor;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.constraints.*;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.validation.annotation.Validated;
+import blog.common.annotation.RepeatSubmit;
+import blog.common.annotation.Log;
+import blog.common.base.controller.BaseController;
+import blog.common.base.req.PageQuery;
+import blog.common.base.resp.R;
+import blog.common.validate.AddGroup;
+import blog.common.validate.EditGroup;
+import blog.common.enums.BusinessType;
+import blog.common.utils.poi.ExcelUtil;
+import ${packageName}.domain.vo.${ClassName}VO;
+import ${packageName}.service.I${ClassName}Service;
+#if($table.crud)
+import blog.common.base.resp.TableDataInfo;
+#elseif($table.tree)
+#end
+
+/**
+ * ${functionName}
+ *
+ * @author ${author}
+ * @date ${datetime}
+ */
+@Validated
+@RequiredArgsConstructor
+@RestController
+@RequestMapping("/${moduleName}/${businessName}")
+public class ${ClassName}Controller extends BaseController {
+
+    private final I${ClassName}Service ${className}Service;
+
+    /**
+     * 查询${functionName}列表
+     */
+    @PreAuthorize("@ss.hasPermi('${permissionPrefix}:list')")
+    @GetMapping("/list")
+#if($table.crud)
+    public TableDataInfo<${ClassName}VO> list(${ClassName}DTO dto, PageQuery pageQuery) {
+        return ${className}Service.queryPageList(dto, pageQuery);
+    }
+#elseif($table.tree)
+    public R<List<${ClassName}VO>> list(${ClassName}DTO dto) {
+        List<${ClassName}VO> list = ${className}Service.queryList(dto);
+        return R.ok(list);
+    }
+#end
+
+    /**
+     * 导出${functionName}列表
+     */
+    @PreAuthorize("@ss.hasPermi('${permissionPrefix}:export')")
+    @Log(title = "${functionName}", businessType = BusinessType.EXPORT)
+    @PostMapping("/export")
+    public void export(${ClassName}DTO dto, HttpServletResponse response) {
+        List<${ClassName}VO> list = ${className}Service.queryList(dto);
+        ExcelUtil<${ClassName}VO> util = new ExcelUtil<>(${ClassName}VO.class);
+        util.exportExcel(response, list, "${functionName}");
+    }
+
+    /**
+     * 获取${functionName}详细信息
+     *
+     * @param ${pkColumn.javaField} 主键
+     */
+    @PreAuthorize("@ss.hasPermi('${permissionPrefix}:query')")
+    @GetMapping("/{${pkColumn.javaField}}")
+    public R<${ClassName}VO> getInfo(@NotNull(message = "主键不能为空")
+                                     @PathVariable ${pkColumn.javaType} ${pkColumn.javaField}) {
+        return R.ok(${className}Service.queryById(${pkColumn.javaField}));
+    }
+
+    /**
+     * 新增${functionName}
+     */
+    @PreAuthorize("@ss.hasPermi('${permissionPrefix}:add')")
+    @Log(title = "${functionName}", businessType = BusinessType.INSERT)
+    @RepeatSubmit()
+    @PostMapping()
+    public R<Void> add(@Validated(AddGroup.class) @RequestBody ${ClassName}DTO dto) {
+        return R.ok(${className}Service.insertByDTO(dto));
+    }
+
+    /**
+     * 修改${functionName}
+     */
+    @PreAuthorize("@ss.hasPermi('${permissionPrefix}:edit')")
+    @Log(title = "${functionName}", businessType = BusinessType.UPDATE)
+    @RepeatSubmit()
+    @PutMapping()
+    public R<Void> edit(@Validated(EditGroup.class) @RequestBody ${ClassName}DTO dto) {
+        return R.ok(${className}Service.updateByDTO(dto));
+    }
+
+    /**
+     * 删除${functionName}
+     *
+     * @param ${pkColumn.javaField}s 主键串
+     */
+    @PreAuthorize("@ss.hasPermi('${permissionPrefix}:remove')")
+    @Log(title = "${functionName}", businessType = BusinessType.DELETE)
+    @DeleteMapping("/{${pkColumn.javaField}s}")
+    public R<Void> remove(@NotEmpty(message = "主键不能为空")
+                          @PathVariable ${pkColumn.javaType}[] ${pkColumn.javaField}s) {
+        return R.ok(${className}Service.deleteWithValidByIds(List.of(${pkColumn.javaField}s), true));
+    }
+}
