@@ -48,21 +48,22 @@ CREATE TABLE IF NOT EXISTS `record` (
 -- ========================================
 -- 3. 报告表
 -- ========================================
-CREATE TABLE IF NOT EXISTS `report` (
-    `id`           BIGINT       NOT NULL AUTO_INCREMENT  COMMENT '主键',
-    `user_id`      BIGINT       NOT NULL                 COMMENT '用户ID',
-    `template`     VARCHAR(32)  NOT NULL                 COMMENT '模板:DIARY/WEEKLY/STUDY_SUMMARY/REVIEW',
-    `title`        VARCHAR(128) DEFAULT NULL             COMMENT '报告标题',
-    `content`      LONGTEXT     DEFAULT NULL             COMMENT '报告内容(Markdown)',
-    `start_date`   DATE         DEFAULT NULL             COMMENT '覆盖开始日期',
-    `end_date`     DATE         DEFAULT NULL             COMMENT '覆盖结束日期',
-    `category`     VARCHAR(16)  DEFAULT NULL             COMMENT '筛选分类:LIFE/STUDY/ALL',
-    `record_count` INT          DEFAULT NULL             COMMENT '基于多少条记录生成',
-    `model`        VARCHAR(64)  DEFAULT NULL             COMMENT '使用的模型名',
-    `tokens_used`  INT          DEFAULT NULL             COMMENT '消耗token数',
+CREATE TABLE IF NOT EXISTS `report`
+(
+    `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `user_id`      BIGINT       NOT NULL                COMMENT '用户ID',
+    `template`     VARCHAR(32)  NOT NULL                COMMENT '模板:DIARY/WEEKLY/STUDY_SUMMARY/REVIEW',
+    `title`        VARCHAR(128) DEFAULT NULL            COMMENT '报告标题',
+    `content`      LONGTEXT     DEFAULT NULL            COMMENT '报告内容(Markdown)',
+    `start_date`   DATE         DEFAULT NULL            COMMENT '覆盖开始日期',
+    `end_date`     DATE         DEFAULT NULL            COMMENT '覆盖结束日期',
+    `category`     VARCHAR(16)  DEFAULT NULL            COMMENT '筛选分类:LIFE/STUDY/ALL',
+    `record_count` INT          DEFAULT NULL            COMMENT '基于多少条记录生成',
+    `model`        VARCHAR(64)  DEFAULT NULL            COMMENT '使用的模型名',
+    `tokens_used`  INT          DEFAULT NULL            COMMENT '消耗token数',
     `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted`      TINYINT      NOT NULL DEFAULT 0       COMMENT '逻辑删除标记(0-正常,1-删除)',
+    `deleted`      TINYINT      NOT NULL DEFAULT 0      COMMENT '逻辑删除标记(0-正常,1-删除)',
     PRIMARY KEY (`id`),
     KEY `idx_user_created` (`user_id`, `created_at`, `deleted`),
     KEY `idx_user_id` (`user_id`)
