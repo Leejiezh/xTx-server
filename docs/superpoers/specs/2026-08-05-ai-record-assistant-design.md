@@ -7,7 +7,7 @@
 | 日期 | 2026-08-05 |
 | 作者 | leeji |
 | 状态 | 设计阶段,待评审 |
-| 技术栈 | uniapp + Spring Boot 3 + Spring AI + MySQL + Redis + 阿里云 OSS + 通义千问 VL |
+| 技术栈 | uniapp + Spring Boot 3 + Spring Security + JWT + MyBatis-Plus + MySQL + Redis + MinIO + Spring AI + 通义千问 VL |
 
 ## 背景与目标
 
@@ -46,7 +46,7 @@
 - 记录管理:新增(文字/拍照 + 选分类)、列表(分类筛选 + 时间倒序)、编辑、删除
 - AI 生成:选时间段 + 分类(可选) + 模板,流式输出
 - 报告管理:保存、列表、详情、复制、分享微信好友
-- 图片上传阿里云 OSS
+- 图片上传 MinIO
 
 ### 明确不做(YAGNI)
 
@@ -86,16 +86,19 @@
 ┌──────────────────────────────────────────┐
 │  Spring Boot 3 后端                        │
 │  ┌────────────────────────────────────┐  │
+│  │ Spring Security(资源过滤链)         │  │
+│  │  └─ JwtAuthFilter(自定义Filter)     │  │
 │  │ Controller: 用户/记录/报告/AI生成   │  │
-│  │ Service:    User/Record/Report/Ai/Oss│  │
-│  │            PromptManager            │  │
-│  │ 基础设施:   Security+JWT / MyBatis-Plus│  │
-│  │            Redis / Spring AI         │  │
+│  │ Service:    User/Record/Report/Ai/  │  │
+│  │            Oss/PromptManager        │  │
+│  │ 基础设施:   SecurityContextHolder    │  │
+│  │            MyBatis-Plus / Redis     │  │
+│  │            Spring AI                │  │
 │  └────────────────────────────────────┘  │
 └────┬──────────┬──────────┬───────────────┘
      ▼          ▼          ▼
  ┌───────┐ ┌────────┐ ┌──────────────┐
- │ MySQL │ │ Redis  │ │ 阿里云 OSS    │
+ │ MySQL │ │ Redis  │ │ MinIO        │
  │业务数据│ │限流/缓存│ │ 图片存储      │
  └───────┘ └────────┘ └──────┬───────┘
                              │ 多模态 API
@@ -112,18 +115,51 @@
 |----|------|----------|
 | 前端 | uniapp + Vue3 + Pinia + uview-plus | 在学 uniapp;Pinia 轻量适合小程序 |
 | 接入 | Nginx + HTTPS + 备案域名 | 小程序强制 HTTPS + 备案 |
-| 后端 | Spring Boot 3 + Spring Security + JWT | Java 主场;JWT 适合无状态小程序 |
+| 后端 | Spring Boot 3 + Spring Security + JWT | Java 主场;Spring Security 认证+授权框架,官方推荐 |
 | ORM | MyBatis-Plus + MySQL | Java 生态主流 |
 | 缓存 | Redis | AI 接口限流 + 生成报告分布式锁(MVP 不做业务缓存) |
 | AI | Spring AI(spring-ai-alibaba-starter)+ 通义千问 VL | 统一封装、流式、多模态;简历加分 |
-| 存储 | 阿里云 OSS | 图片不能存本地;和通义同生态 |
+| 存储 | MinIO(本地开发) | 类 OSS 的对象存储,兼容 S3 API,本地调试方便;部署可切阿里云 OSS |
 | 部署 | 阿里云轻量服务器 + Docker | 50-100 元/月,够用 |
 
-### 3 个关键架构决策
+### 4 个关键架构决策
 
 1. **Spring AI 而非裸 HTTP**:统一封装通义千问 VL 的文本/多模态/流式调用,切换模型只改配置代码不动。简历上"基于 Spring AI 集成多模态大模型"比"OkHttp 调 API"亮。
 2. **通义千问 VL 而非其他**:阿里云生态(OSS + 百炼平台同账号同地域,内网调用快且省流量费)、价格便宜、Spring AI 有官方 starter、文本 + 多模态一个模型搞定。
 3. **Redis 做限流**:AI 接口按 token 收费,必须限制单用户每日生成次数(默认 10 次/天),防止被刷爆账单。工程化亮点。
+
+4. **Spring Security 无状态 JWT 集成**:替换自定义 JwtAuthInterceptor,走 Spring Security 标准 Filter 链。统一认证抽象,Service 层通过 `SecurityContextHolder` 获取当前用户,不依赖 Request 传参;为后续管理后台 RBAC 预留扩展点。
+
+### Spring Security 集成设计
+
+**依赖**:`spring-boot-starter-security`(Spring Boot 3.4.0 已自带版本管理)。
+
+**架构**:
+```
+SecurityFilterChain(无状态)
+  ├── CorsFilter(允许小程序域名)
+  ├── JwtAuthFilter(自定义 OncePerRequestFilter)
+  │   ├── 从 Authorization header 提取 JWT
+  │   ├── 解析 userId -> UsernamePasswordAuthenticationToken
+  │   └── 注入 SecurityContextHolder
+  └── ExceptionTranslationFilter(401 处理)
+```
+
+**关键配置**:
+- 会话管理:`SessionCreationPolicy.STATELESS`(小程序无 Cookie)
+- 放行:`POST /api/auth/login`(微信登录接口)
+- 其余:全部需认证,自动 401
+- 关闭 CSRF(纯 API,无 Cookie)
+
+**Service 层获取用户 ID**:
+```java
+// 不再需要 Controller 传参,任何地方直接获取
+Long userId = SecurityUtils.getCurrentUserId();
+```
+
+**CORS 配置**:通过 Spring Security 的 `CorsConfigurationSource` 统一管理,替代 `WebMvcConfig` 中的跨域配置,后续可在此基础上加 IP 限流。
+
+**与现有代码的桥接**:`JwtUtils`(xtx-common 已有)继续使用,`JwtAuthFilter` 复用其解析逻辑;`GlobalExceptionHandler` 保持不变,Spring Security 的 `AccessDeniedException` 映射到 `R.fail(403)`。
 
 ### 提示词管理模块(核心资产)
 
@@ -143,9 +179,9 @@ src/main/resources/prompts/
 ### 部署形态(单机够用)
 
 - 1 台阿里云轻量服务器(2 核 2G 或 4G)
-- Docker 跑后端 jar + MySQL + Redis(docker-compose)
+- Docker 跑后端 jar + MySQL + Redis + MinIO(docker-compose)
 - Nginx 跑宿主机或容器,做 HTTPS + 反代
-- OSS 和通义千问用阿里云托管服务,不在自己服务器
+- 通义千问用阿里云托管服务,不在自己服务器
 
 ## 3. 数据模型
 
@@ -245,7 +281,7 @@ record 与 report 无直接关联(报告基于时间段+分类查记录生成,�
 
 ```
 1. (可选)上传图片: POST /api/upload/image (multipart)
-   后端: 存OSS -> 返回 {imageUrl}
+   后端: 存MinIO -> 返回 {imageUrl}
    可重复调用,上传 0-N 张
 
 2. (可选)对某张图片 AI 识别成文字:
@@ -327,7 +363,7 @@ record 与 report 无直接关联(报告基于时间段+分类查记录生成,�
 
 ### 数据流小结
 
-| 流程 | 写 MySQL | 写 Redis | 调 AI | 调微信 | 调 OSS |
+| 流程 | 写 MySQL | 写 Redis | 调 AI | 调微信 | 存储 |
 |------|----------|----------|-------|--------|--------|
 | 登录 | 读+写 user | ❌ | ❌ | ✅ jscode2session | ❌ |
 | 上传图片 | ❌ | ❌ | ❌ | ❌ | ✅ 存图 |
@@ -340,19 +376,20 @@ record 与 report 无直接关联(报告基于时间段+分类查记录生成,�
 
 ### 统一约定
 
-**响应格式**:
+**响应格式**(统一使用框架 `R<T>` 格式):
 ```json
-{ "code": 0, "message": "ok", "data": {...} }
+{ "code": 200, "msg": "success", "data": {...} }
 ```
 
-**鉴权**:除 `POST /api/auth/login` 外,所有接口需 `Authorization: Bearer {jwt}` 头。
+**鉴权**:通过 Spring Security Filter 链统一拦截。除 `POST /api/auth/login` 外,所有接口需 `Authorization: Bearer {jwt}` 头。JWT 失效或缺失自动返回 401。
 
 **错误码**:
 
 | code | 含义 | 触发场景 |
 |------|------|----------|
-| 0 | 成功 | 正常 |
+| 200 | 成功 | 正常 |
 | 401 | 未登录/Token 失效 | JWT 校验失败 |
+| 403 | 无权限 | 越权访问 |
 | 429 | 配额超限或并发锁 | 当日 AI 生成次数用完 / 正在生成中 |
 | 430 | 内容不合规 | msgSecCheck 检测到违规 |
 | 422 | 业务校验失败 | 时间段无记录、参数错误等 |
@@ -370,7 +407,7 @@ record 与 report 无直接关联(报告基于时间段+分类查记录生成,�
 | 记录 | GET | `/api/records/{id}` | 记录详情 |
 | 记录 | PUT | `/api/records/{id}` | 编辑记录 |
 | 记录 | DELETE | `/api/records/{id}` | 删除(逻辑删除) |
-| 上传 | POST | `/api/upload/image` | 上传图片到 OSS,返 URL |
+| 上传 | POST | `/api/upload/image` | 上传图片到 MinIO,返 URL |
 | AI | POST | `/api/ai/extract` | 拍照识别文字(可选辅助) |
 | 报告 | POST | `/api/reports/generate` | 流式生成报告(SSE) |
 | 报告 | GET | `/api/reports?page&size` | 报告列表 |
@@ -395,7 +432,7 @@ POST /api/records
 Req:  {
   "category": "LIFE",
   "content": "今天去公园散步,天气很好",
-  "images": ["https://oss.../a.jpg"],
+  "images": ["https://minio.example.com/bucket/a.jpg"],
   "source": "MANUAL",
   "recordDate": "2026-08-05"
 }
@@ -436,7 +473,7 @@ Resp: { "dailyQuota":10, "usedToday":3, "remaining":7 }
 
 | 场景 | 触发时机 | 处理 | 错误码 |
 |------|----------|------|--------|
-| JWT 过期/无效 | 每次请求拦截器校验 | 返回 401,前端跳登录 | 401 |
+| JWT 过期/无效 | 每次请求 Spring Security Filter 校验 | 返回 401,前端跳登录 | 401 |
 | 配额超限 | 生成报告前 Redis 检查 | 拒绝调用 | 429 |
 | Redis 不可用 | 配额检查时 | **降级**:允许调用 + 告警日志 | - |
 | 时间段无记录 | 生成报告前查记录数 | 返回"该时间段无记录" | 422 |
@@ -498,7 +535,7 @@ recordMapper.selectOne(new LambdaQueryWrapper<Record>()
 | SQL 注入 | MyBatis-Plus 参数化查询,禁止拼 SQL |
 | 图片安全 | 大小 5MB 内,格式 jpg/png/webp,**用魔数校验而非扩展名**(防伪装) |
 | 接口限流 | 除用户配额外,Nginx 层 IP 限流(如 60 次/分钟),防恶意刷接口 |
-| 敏感信息 | API Key、OSS 密钥存环境变量,不进 git;`.env` 加 `.gitignore` |
+| 敏感信息 | API Key、MinIO 密钥存环境变量,不进 git;`.env` 加 `.gitignore` |
 
 ## 7. 测试策略
 
@@ -609,5 +646,5 @@ void generateReport_success() {
 - 统计图表、关键词云
 - 自定义分类、自定义模板
 - 多模态报告生成(图片参与报告生成,2.0)
-- 小程序端直传 OSS(MVP 走后端转发,2.0 用 STS 直传优化)
+- 小程序端直传 MinIO(MVP 走后端转发,2.0 用 STS 直传优化)
 - WebSocket 双向通信(SSE 足够)
