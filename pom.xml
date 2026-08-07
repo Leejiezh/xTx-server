@@ -33,6 +33,7 @@
         <minio.version>8.5.17</minio.version>
         <jjwt.version>0.12.6</jjwt.version>
         <wx-java.version>4.8.3.B</wx-java.version>
+        <springdoc.version>2.7.0</springdoc.version>
     </properties>
 
     <dependencyManagement>
@@ -108,6 +109,13 @@
                 <version>${wx-java.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- springdoc -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
