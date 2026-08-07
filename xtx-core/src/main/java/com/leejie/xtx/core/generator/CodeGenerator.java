@@ -3,29 +3,34 @@ package com.leejie.xtx.core.generator;
 import com.baomidou.mybatisplus.generator.FastAutoGenerator;
 import com.baomidou.mybatisplus.generator.config.OutputFile;
 import com.baomidou.mybatisplus.generator.config.rules.DbColumnType;
+import com.baomidou.mybatisplus.generator.engine.VelocityTemplateEngine;
 
 import java.sql.Types;
 import java.util.Collections;
 
 /**
- * MyBatis-Plus 代码生成器
- * 运行前请修改数据库连接信息
+ * MyBatis-Plus 代码生成器主入口
+ *
+ * <p>运行前请确认数据库连接信息正确，会覆盖已存在的文件。
+ * 只生成 Entity/Mapper/XML/Service/ServiceImpl，
+ * DTO 和 Controller 由 {@link DtoGenerator} 生成。
  */
 public class CodeGenerator {
 
+    static final String URL = "jdbc:mysql://localhost:3306/xtx?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai";
+    static final String USERNAME = "root";
+    static final String PASSWORD = "root";
+
+    /** 要生成的表（排除 user 表） */
+    static final String[] TABLES = {"record", "report"};
+
     public static void main(String[] args) {
-        String url = "jdbc:mysql://localhost:3306/xtx?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai";
-        String username = "root";
-        String password = "root";
-
         String projectPath = System.getProperty("user.dir");
-        // 如果是在 xtx-core 模块下运行，需要调整输出路径
-        String outputDir = projectPath + "/xtx-core/src/main/java";
 
-        FastAutoGenerator.create(url, username, password)
+        FastAutoGenerator.create(URL, USERNAME, PASSWORD)
                 .globalConfig(builder -> builder
                         .author("leejie")
-                        .outputDir(outputDir)
+                        .outputDir(projectPath + "/xtx-core/src/main/java")
                         .disableOpenDir()
                 )
                 .dataSourceConfig(builder -> builder
@@ -39,22 +44,36 @@ public class CodeGenerator {
                 )
                 .packageConfig(builder -> builder
                         .parent("com.leejie.xtx.core")
-                        .entity("user.entity")
-                        .mapper("user.mapper")
-                        .service("user.service")
-                        .serviceImpl("user.service.impl")
-                        .pathInfo(Collections.singletonMap(OutputFile.xml, projectPath + "/xtx-core/src/main/resources/mapper"))
+                        .entity("entity")
+                        .mapper("mapper")
+                        .service("service")
+                        .serviceImpl("service.impl")
+                        .pathInfo(Collections.singletonMap(
+                                OutputFile.xml,
+                                projectPath + "/xtx-core/src/main/resources/mapper"))
                 )
-                .strategyConfig(builder -> builder
-                        .addInclude("user", "goods") // 替换为实际的表名
-                        .entityBuilder()
-                        .enableLombok()
-                        .logicDeleteColumnName("deleted")
-                        .controllerBuilder()
-                        .disable()
-                        .serviceBuilder()
-                        .formatServiceFileName("%sService")
+                .strategyConfig(builder -> {
+                    builder.addInclude(TABLES)
+                            .entityBuilder()
+                            .enableLombok()
+                            .logicDeleteColumnName("deleted")
+                            .disableSerialVersionUID()
+                            .controllerBuilder()
+                            .disable()
+                            .serviceBuilder()
+                            .formatServiceFileName("%sService");
+                })
+                .templateConfig(builder -> builder
+                        .entity("/templates/entity.java.vm")
+                        .service("/templates/service.java.vm")
+                        .serviceImpl("/templates/serviceImpl.java.vm")
+                        .mapper("/templates/mapper.java.vm")
+                        .xml(null)
                 )
+                .templateEngine(new VelocityTemplateEngine())
                 .execute();
+
+        // 第二步：生成 DTO 和 Controller
+        DtoGenerator.generate(TABLES);
     }
 }
