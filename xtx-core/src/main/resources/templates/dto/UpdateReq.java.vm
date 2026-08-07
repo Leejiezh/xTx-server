@@ -1,0 +1,34 @@
+package ${packageName};
+
+import ${entityFullName};
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+import org.springframework.beans.BeanUtils;
+
+#if(${tableComment})
+@Schema(description = "${tableComment}更新请求")
+#end
+@Data
+public class ${className} {
+
+    @NotNull(message = "id不能为空")
+    @Schema(description = "主键ID")
+    private Long id;
+
+#foreach($field in $fields)
+    #if(${field.comment})
+    @Schema(description = "${field.comment}")
+    #end
+    #if(!${field.nullable})
+    @NotNull(message = "${field.comment}不能为空")
+    #end
+    private ${field.type} ${field.name};
+#end
+
+    public ${entityName} toEntity() {
+        ${entityName} entity = new ${entityName}();
+        BeanUtils.copyProperties(this, entity);
+        return entity;
+    }
+}

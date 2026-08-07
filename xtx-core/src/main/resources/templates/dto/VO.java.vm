@@ -1,0 +1,26 @@
+package ${packageName};
+
+import ${entityFullName};
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+import org.springframework.beans.BeanUtils;
+
+#if(${tableComment})
+@Schema(description = "${tableComment}视图对象")
+#end
+@Data
+public class ${className} {
+
+#foreach($field in $fields)
+    #if(${field.comment})
+    @Schema(description = "${field.comment}")
+    #end
+    private ${field.type} ${field.name};
+#end
+
+    public static ${className} fromEntity(${entityName} entity) {
+        ${className} vo = new ${className}();
+        BeanUtils.copyProperties(entity, vo);
+        return vo;
+    }
+}

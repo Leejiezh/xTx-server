@@ -1,0 +1,55 @@
+package ${packageName};
+
+import com.leejie.xtx.common.base.query.PageQuery;
+import com.leejie.xtx.common.base.vo.PageResult;
+import com.leejie.xtx.common.result.R;
+import ${serviceFullName};
+import ${createReqFullName};
+import ${updateReqFullName};
+import ${voFullName};
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+@Tag(name = "${tableComment}管理")
+@RestController
+@RequestMapping("/${mapping}")
+@RequiredArgsConstructor
+public class ${className} {
+
+    private final ${serviceName} ${serviceVar};
+
+    @PostMapping
+    @Operation(summary = "创建${tableComment}")
+    public R<Long> create(@Valid @RequestBody ${createReqName} req) {
+        return R.ok(${serviceVar}.create(req.toEntity()));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "查询${tableComment}详情")
+    public R<${voName}> get(@PathVariable Long id) {
+        return R.ok(${voName}.fromEntity(${serviceVar}.get(id)));
+    }
+
+    @PutMapping
+    @Operation(summary = "更新${tableComment}")
+    public R<Void> update(@Valid @RequestBody ${updateReqName} req) {
+        ${serviceVar}.update(req.toEntity());
+        return R.ok();
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "删除${tableComment}")
+    public R<Void> delete(@PathVariable Long id) {
+        ${serviceVar}.delete(id);
+        return R.ok();
+    }
+
+    @GetMapping("/page")
+    @Operation(summary = "分页查询${tableComment}")
+    public R<PageResult<${voName}>> page(PageQuery query) {
+        return R.ok(PageResult.of(${serviceVar}.page(query, null), ${voName}::fromEntity));
+    }
+}
