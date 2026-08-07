@@ -1,0 +1,23 @@
+package ${package.Entity};
+
+import com.leejie.xtx.common.base.entity.OwnedEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+#if(${table.comment})
+@Schema(description = "${table.comment}")
+#end
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class ${entity} extends OwnedEntity {
+
+#foreach($field in ${table.fields})
+    #if(!${field.keyFlag})
+    #if(${field.comment})
+    @Schema(description = "${field.comment}")
+    #end
+    private ${field.propertyType} ${field.propertyName};
+    #end
+#end
+}

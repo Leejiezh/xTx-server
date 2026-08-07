@@ -1,0 +1,10 @@
+package ${package.Service};
+
+import com.leejie.xtx.common.base.service.OwnedService;
+import ${package.Entity}.${entity};
+
+/**
+ * $!{table.comment} 服务接口
+ */
+public interface ${table.serviceName} extends OwnedService<${entity}> {
+}
