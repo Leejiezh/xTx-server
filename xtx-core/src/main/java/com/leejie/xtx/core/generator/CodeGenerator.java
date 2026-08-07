@@ -19,7 +19,7 @@ public class CodeGenerator {
 
     static final String URL = "jdbc:mysql://localhost:3306/xtx?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai";
     static final String USERNAME = "root";
-    static final String PASSWORD = "root";
+    static final String PASSWORD = "123456";
 
     /** 要生成的表（排除 user 表） */
     static final String[] TABLES = {"record", "report"};
@@ -36,7 +36,7 @@ public class CodeGenerator {
                 .dataSourceConfig(builder -> builder
                         .typeConvertHandler((globalConfig, typeRegistry, metaInfo) -> {
                             int type = metaInfo.getJdbcType().TYPE_CODE;
-                            if (type == Types.SMALLINT) {
+                            if (type == Types.SMALLINT || type == Types.TINYINT) {
                                 return DbColumnType.INTEGER;
                             }
                             return typeRegistry.getColumnType(metaInfo);

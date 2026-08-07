@@ -5,6 +5,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;
 
+#foreach($imp in $imports)
+import $imp;
+#end
+
 #if(${tableComment})
 @Schema(description = "${tableComment}视图对象")
 #end

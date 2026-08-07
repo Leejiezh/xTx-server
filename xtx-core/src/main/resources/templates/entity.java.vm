@@ -5,6 +5,30 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+## 检测字段类型，按需导入 java.time / java.math 包
+#set($importLocalDateTime = false)
+#set($importLocalDate = false)
+#set($importLocalTime = false)
+#set($importBigDecimal = false)
+#foreach($field in ${table.fields})
+#if(${field.propertyType} == "LocalDateTime")#set($importLocalDateTime = true)#end
+#if(${field.propertyType} == "LocalDate")#set($importLocalDate = true)#end
+#if(${field.propertyType} == "LocalTime")#set($importLocalTime = true)#end
+#if(${field.propertyType} == "BigDecimal")#set($importBigDecimal = true)#end
+#end
+#if($importLocalDateTime)
+import java.time.LocalDateTime;
+#end
+#if($importLocalDate)
+import java.time.LocalDate;
+#end
+#if($importLocalTime)
+import java.time.LocalTime;
+#end
+#if($importBigDecimal)
+import java.math.BigDecimal;
+#end
+
 #if(${table.comment})
 @Schema(description = "${table.comment}")
 #end
@@ -15,9 +39,11 @@ public class ${entity} extends OwnedEntity {
 #foreach($field in ${table.fields})
     #if(!${field.keyFlag})
     #if(${field.comment})
+    /** ${field.comment} */
     @Schema(description = "${field.comment}")
     #end
     private ${field.propertyType} ${field.propertyName};
+
     #end
 #end
 }

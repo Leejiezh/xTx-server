@@ -50,13 +50,13 @@ public class DtoGenerator {
         TYPE_MAP.put("SMALLINT", "Integer");
         TYPE_MAP.put("BIGINT", "Long");
         TYPE_MAP.put("BIGINT UNSIGNED", "Long");
-        TYPE_MAP.put("DECIMAL", "java.math.BigDecimal");
+        TYPE_MAP.put("DECIMAL", "BigDecimal");
         TYPE_MAP.put("FLOAT", "Float");
         TYPE_MAP.put("DOUBLE", "Double");
-        TYPE_MAP.put("DATE", "java.time.LocalDate");
-        TYPE_MAP.put("DATETIME", "java.time.LocalDateTime");
-        TYPE_MAP.put("TIMESTAMP", "java.time.LocalDateTime");
-        TYPE_MAP.put("TIME", "java.time.LocalTime");
+        TYPE_MAP.put("DATE", "LocalDate");
+        TYPE_MAP.put("DATETIME", "LocalDateTime");
+        TYPE_MAP.put("TIMESTAMP", "LocalDateTime");
+        TYPE_MAP.put("TIME", "LocalTime");
         TYPE_MAP.put("BOOLEAN", "Boolean");
         TYPE_MAP.put("BLOB", "byte[]");
         TYPE_MAP.put("JSON", "String");
@@ -82,21 +82,21 @@ public class DtoGenerator {
     private static void generateForTable(Connection conn, VelocityEngine engine, String tableName) throws Exception {
         String tableComment = getTableComment(conn, tableName);
         List<FieldInfo> columns = getColumns(conn, tableName);
-        String entityName = toPascalCase(tableName) + "Entity";
+        String entityName = toPascalCase(tableName);
         String className = toPascalCase(tableName);
 
         // 生成 CreateReq
-        renderDto(engine, "dto/CreateReq.java.vm", DTO_PACKAGE,
+        renderDto(engine, "/templates/dto/CreateReq.java.vm", DTO_PACKAGE,
                 className + "CreateReq", tableComment, filterCreateFields(columns),
                 entityName, ENTITY_PACKAGE + "." + entityName);
 
         // 生成 UpdateReq
-        renderDto(engine, "dto/UpdateReq.java.vm", DTO_PACKAGE,
+        renderDto(engine, "/templates/dto/UpdateReq.java.vm", DTO_PACKAGE,
                 className + "UpdateReq", tableComment, filterUpdateFields(columns),
                 entityName, ENTITY_PACKAGE + "." + entityName);
 
         // 生成 VO（包含所有业务字段 + id）
-        renderDto(engine, "dto/VO.java.vm", DTO_PACKAGE,
+        renderDto(engine, "/templates/dto/VO.java.vm", DTO_PACKAGE,
                 className + "VO", tableComment, getAllVoFields(conn, tableName, columns),
                 entityName, ENTITY_PACKAGE + "." + entityName);
 
@@ -115,6 +115,7 @@ public class DtoGenerator {
         ctx.put("fields", fields);
         ctx.put("entityName", entityName);
         ctx.put("entityFullName", entityFullName);
+        ctx.put("imports", collectImports(fields));
 
         String outputPath = OUTPUT_DIR + "/" + packageName.replace('.', '/') + "/" + className + ".java";
         ensureParentDir(outputPath);
@@ -151,7 +152,7 @@ public class DtoGenerator {
         ensureParentDir(outputPath);
 
         try (Writer writer = new FileWriter(outputPath)) {
-            Template template = engine.getTemplate("dto/Controller.java.vm", "UTF-8");
+            Template template = engine.getTemplate("/templates/dto/Controller.java.vm", "UTF-8");
             template.merge(ctx, writer);
         }
 
@@ -281,9 +282,28 @@ public class DtoGenerator {
         }
     }
 
+    /** 计算字段类型需要的额外 import（java.time / java.math） */
+    private static List<String> collectImports(List<FieldInfo> fields) {
+        Map<String, String> typeToImport = new HashMap<>();
+        typeToImport.put("BigDecimal", "java.math.BigDecimal");
+        typeToImport.put("LocalDate", "java.time.LocalDate");
+        typeToImport.put("LocalDateTime", "java.time.LocalDateTime");
+        typeToImport.put("LocalTime", "java.time.LocalTime");
+
+        List<String> imports = new ArrayList<>();
+        for (FieldInfo f : fields) {
+            String imp = typeToImport.get(f.type);
+            if (imp != null && !imports.contains(imp)) {
+                imports.add(imp);
+            }
+        }
+        Collections.sort(imports);
+        return imports;
+    }
+
     // ---- 内部类 ----
 
-    static class FieldInfo {
+    public static class FieldInfo {
         final String name;
         final String type;
         final String comment;
