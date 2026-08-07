@@ -1,5 +1,7 @@
 package com.leejie.xtx.core.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.leejie.xtx.common.base.entity.OwnedEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -11,10 +13,12 @@ import java.time.LocalDate;
 @Schema(description = "记录表")
 @Data
 @EqualsAndHashCode(callSuper = true)
+@TableName("record")
 public class Record extends OwnedEntity {
 
     /** 用户ID */
     @Schema(description = "用户ID")
+    @TableField
     private Long userId;
 
     /** 分类:LIFE/STUDY */
