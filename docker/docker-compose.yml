@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0.44
+    container_name: mysql8
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: demo
+      MYSQL_USER: leejie
+      MYSQL_PASSWORD: 123456
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      # 数据持久化
+      - /data/mysql/data:/var/lib/mysql
+      # 自定义配置
+      - /data/mysql/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+    command:
+      --default-authentication-plugin=mysql_native_password
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis-server
+    ports:
+      - "6379:6379"
+    # 从redis.conf配置文件启动
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      # 数据持久化卷
+      - redis_data:/data
+      # 挂载redis.conf文件（相对路径，相对于docker-compose.yml所在目录）
+      - /data/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - mysql
+
+volumes:
+  redis_data:
+    name: xtx_redis_data
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
