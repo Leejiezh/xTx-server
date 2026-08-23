@@ -27,7 +27,7 @@
 @SpringBootTest
 class MinioConnectivityTest {
     @Autowired MinioClient minioClient;
-    @Value("${minio.bucket}") String bucket;
+    @Autowired MinioConfig minioConfig;   // endpoint/accessKey/bucket 均来自配置
 }
 ```
 
