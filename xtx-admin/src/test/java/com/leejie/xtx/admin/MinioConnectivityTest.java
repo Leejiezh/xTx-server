@@ -83,8 +83,7 @@ class MinioConnectivityTest {
         } finally {
             // 5. 清理：无论断言是否失败都删除测试对象
             try {
-                minioClient.removeObject(
-                        RemoveObjectArgs.builder().bucket(bucket).object(objectName).build());
+//                minioClient.removeObject(RemoveObjectArgs.builder().bucket(bucket).object(objectName).build());
             } catch (Exception ignored) {
                 // 清理失败不影响测试结果，避免掩盖原始断言错误
             }
