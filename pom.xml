@@ -24,6 +24,7 @@
         <module>xtx-wechat</module>
         <module>xtx-api</module>
         <module>xtx-admin</module>
+        <module>xtx-code-generator</module>
     </modules>
 
     <properties>

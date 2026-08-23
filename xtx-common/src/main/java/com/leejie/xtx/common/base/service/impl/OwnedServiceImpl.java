@@ -18,9 +18,8 @@ import java.util.function.Consumer;
 /**
  * {@link OwnedService} 的唯一实现 —— ownership 约束在这一个文件里收口。
  *
- * <p>用字符串列名而不是 {@code LambdaQueryWrapper} 的方法引用：MyBatis-Plus 解析
- * lambda 时会把声明类认成 {@link OwnedEntity}，而它没有 {@code @TableName}、
- * 拿不到 TableInfo，运行时报 "can not find lambda cache"。id 与 user_id 这两个
+ * <p>用字符串列名而非 {@code LambdaQueryWrapper} 的方法引用：本类是泛型基类，
+ * 无法写 {@code T::getUserId} 这样的方法引用，只能用字符串。id 与 user_id 这两个
  * 列名在 DDL 里写死且 record / report 两表一致，用字符串是安全的。
  *
  * @param <M> Mapper 类型

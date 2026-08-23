@@ -1,4 +1,4 @@
-package com.leejie.xtx.core.generator;
+package com.leejie.xtx.generator;
 
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;

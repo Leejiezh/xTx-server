@@ -1,4 +1,4 @@
-package com.leejie.xtx.core.generator;
+package com.leejie.xtx.generator;
 
 import com.baomidou.mybatisplus.generator.FastAutoGenerator;
 import com.baomidou.mybatisplus.generator.config.OutputFile;

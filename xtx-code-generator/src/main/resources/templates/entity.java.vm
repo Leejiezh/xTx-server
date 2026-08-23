@@ -5,16 +5,21 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+## 基类(BaseEntity/OwnedEntity)已声明这些字段，实体生成时跳过，避免重复声明
+#set($baseFields = ["userId", "createdAt", "updatedAt", "deleted"])
+
 ## 检测字段类型，按需导入 java.time / java.math 包
 #set($importLocalDateTime = false)
 #set($importLocalDate = false)
 #set($importLocalTime = false)
 #set($importBigDecimal = false)
 #foreach($field in ${table.fields})
+#if(!${field.keyFlag} && !${baseFields.contains($field.propertyName)})
 #if(${field.propertyType} == "LocalDateTime")#set($importLocalDateTime = true)#end
 #if(${field.propertyType} == "LocalDate")#set($importLocalDate = true)#end
 #if(${field.propertyType} == "LocalTime")#set($importLocalTime = true)#end
 #if(${field.propertyType} == "BigDecimal")#set($importBigDecimal = true)#end
+#end
 #end
 #if($importLocalDateTime)
 import java.time.LocalDateTime;
@@ -37,7 +42,7 @@ import java.math.BigDecimal;
 public class ${entity} extends OwnedEntity {
 
 #foreach($field in ${table.fields})
-    #if(!${field.keyFlag})
+    #if(!${field.keyFlag} && !${baseFields.contains($field.propertyName)})
     #if(${field.comment})
     /** ${field.comment} */
     @Schema(description = "${field.comment}")

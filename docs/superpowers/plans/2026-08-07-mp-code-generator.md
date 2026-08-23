@@ -4,7 +4,7 @@
 
 **Goal:** 一个运行 `CodeGenerator.main()` 即可根据数据库表生成完整 Controller → Service → Entity → Mapper 代码的工具，所有生成代码都继承项目的基类体系并携带 API 文档注解。
 
-**Architecture:** 双层生成器：FastAutoGenerator 负责 Entity/Mapper/Service/ServiceImpl（通过自定义 VM 模板适配基类），DtoGenerator 独立处理 DTO/Controller（JDBC 读表结构 + Velocity 渲染）。所有模板文件集中在 `resources/templates/`。
+**Architecture:** 生成器位于独立 Maven 模块 `xtx-code-generator`（包 `com.leejie.xtx.generator`）。双层生成器：FastAutoGenerator 负责 Entity/Mapper/Service/ServiceImpl（通过自定义 VM 模板适配基类），DtoGenerator 独立处理 DTO/Controller（JDBC 读表结构 + Velocity 渲染）。所有模板文件集中在 `xtx-code-generator/src/main/resources/templates/`。生成的业务代码输出到 `xtx-core`。
 
 **Tech Stack:** MyBatis-Plus Generator 3.5.9, Velocity 2.3, SpringDoc 2.7.0, JDBC (MySQL), Java 21
 
@@ -16,7 +16,7 @@
 - 全部类/字段/方法均携带 SpringDoc 注解（`@Schema`, `@Tag`, `@Operation`）
 - DTO 使用 `jakarta.validation` 校验注解（`@NotBlank`, `@NotNull` 等）
 - 统一响应体使用 `R<T>`（`R.ok(data)`），分页使用 `PageResult.of(page, XxxVO::fromEntity)`
-- 生成代码路径：`xtx-core/src/main/java/com/leejie/xtx/core/` 下按分层分包
+- 生成代码路径：`xtx-core/src/main/java/com/leejie/xtx/core/` 下按分层分包；生成器自身代码与模板位于独立模块 `xtx-code-generator/`（包 `com.leejie.xtx.generator`）
 - 生成器可反复运行，覆盖已存在文件
 
 ---
@@ -77,10 +77,10 @@ git commit -m "feat(deps): 集成 springdoc-openapi 2.7.0 用于 API 文档注�
 ### Task 2: 创建模板目录和 Entity/Service/ServiceImpl/Mapper 的 VM 模板
 
 **Files:**
-- Create: `xtx-core/src/main/resources/templates/entity.java.vm`
-- Create: `xtx-core/src/main/resources/templates/service.java.vm`
-- Create: `xtx-core/src/main/resources/templates/serviceImpl.java.vm`
-- Create: `xtx-core/src/main/resources/templates/mapper.java.vm`
+- Create: `xtx-code-generator/src/main/resources/templates/entity.java.vm`
+- Create: `xtx-code-generator/src/main/resources/templates/service.java.vm`
+- Create: `xtx-code-generator/src/main/resources/templates/serviceImpl.java.vm`
+- Create: `xtx-code-generator/src/main/resources/templates/mapper.java.vm`
 
 **Interfaces:**
 - Consumes: 数据库表结构（FastAutoGenerator 传入 `table`, `package`, `entity` 等变量）
@@ -89,7 +89,7 @@ git commit -m "feat(deps): 集成 springdoc-openapi 2.7.0 用于 API 文档注�
 - [ ] **Step 1：创建模板目录**
 
 ```bash
-mkdir -p xtx-core/src/main/resources/templates/dto
+mkdir -p xtx-code-generator/src/main/resources/templates/dto
 ```
 
 - [ ] **Step 2：编写 entity.java.vm**
@@ -102,6 +102,35 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+## 基类(BaseEntity/OwnedEntity)已声明这些字段，实体生成时跳过，避免重复声明
+#set($baseFields = ["userId", "createdAt", "updatedAt", "deleted"])
+
+## 检测字段类型，按需导入 java.time / java.math 包
+#set($importLocalDateTime = false)
+#set($importLocalDate = false)
+#set($importLocalTime = false)
+#set($importBigDecimal = false)
+#foreach($field in ${table.fields})
+#if(!${field.keyFlag} && !${baseFields.contains($field.propertyName)})
+#if(${field.propertyType} == "LocalDateTime")#set($importLocalDateTime = true)#end
+#if(${field.propertyType} == "LocalDate")#set($importLocalDate = true)#end
+#if(${field.propertyType} == "LocalTime")#set($importLocalTime = true)#end
+#if(${field.propertyType} == "BigDecimal")#set($importBigDecimal = true)#end
+#end
+#end
+#if($importLocalDateTime)
+import java.time.LocalDateTime;
+#end
+#if($importLocalDate)
+import java.time.LocalDate;
+#end
+#if($importLocalTime)
+import java.time.LocalTime;
+#end
+#if($importBigDecimal)
+import java.math.BigDecimal;
+#end
+
 #if(${table.comment})
 @Schema(description = "${table.comment}")
 #end
@@ -110,11 +139,13 @@ import lombok.EqualsAndHashCode;
 public class ${entity} extends OwnedEntity {
 
 #foreach($field in ${table.fields})
-    #if(!${field.keyFlag})
+    #if(!${field.keyFlag} && !${baseFields.contains($field.propertyName)})
     #if(${field.comment})
+    /** ${field.comment} */
     @Schema(description = "${field.comment}")
     #end
     private ${field.propertyType} ${field.propertyName};
+
     #end
 #end
 }
@@ -172,7 +203,7 @@ public interface ${table.mapperName} extends BaseMapper<${entity}> {
 - [ ] **Step 6：提交**
 
 ```bash
-git add xtx-core/src/main/resources/templates/
+git add xtx-code-generator/src/main/resources/templates/
 git commit -m "feat(generator): 添加 Entity/Service/ServiceImpl/Mapper 的 VM 模板"
 ```
 
@@ -181,20 +212,19 @@ git commit -m "feat(generator): 添加 Entity/Service/ServiceImpl/Mapper 的 VM 
 ### Task 3: 重写 CodeGenerator.java（FastAutoGenerator 部分）
 
 **Files:**
-- Modify: `xtx-core/src/main/java/com/leejie/xtx/core/generator/CodeGenerator.java`
+- Modify: `xtx-code-generator/src/main/java/com/leejie/xtx/generator/CodeGenerator.java`
 
 **Interfaces:**
-- Consumes: 数据库连接信息 + tables 数组 + `resources/templates/` 下的 VM 模板
+- Consumes: 数据库连接信息 + tables 数组 + `xtx-code-generator/src/main/resources/templates/` 下的 VM 模板
 - Produces: Entity/Mapper/XML/Service/ServiceImpl 文件到 `xtx-core/src/main/java/com/leejie/xtx/core/` 下对应分层分包
 
 - [ ] **Step 1：编写 CodeGenerator.java**
 
 ```java
-package com.leejie.xtx.core.generator;
+package com.leejie.xtx.generator;
 
 import com.baomidou.mybatisplus.generator.FastAutoGenerator;
 import com.baomidou.mybatisplus.generator.config.OutputFile;
-import com.baomidou.mybatisplus.generator.config.TemplateType;
 import com.baomidou.mybatisplus.generator.config.rules.DbColumnType;
 import com.baomidou.mybatisplus.generator.engine.VelocityTemplateEngine;
 
@@ -212,7 +242,7 @@ public class CodeGenerator {
 
     static final String URL = "jdbc:mysql://localhost:3306/xtx?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai";
     static final String USERNAME = "root";
-    static final String PASSWORD = "root";
+    static final String PASSWORD = "123456";
 
     /** 要生成的表（排除 user 表） */
     static final String[] TABLES = {"record", "report"};
@@ -229,7 +259,7 @@ public class CodeGenerator {
                 .dataSourceConfig(builder -> builder
                         .typeConvertHandler((globalConfig, typeRegistry, metaInfo) -> {
                             int type = metaInfo.getJdbcType().TYPE_CODE;
-                            if (type == Types.SMALLINT) {
+                            if (type == Types.SMALLINT || type == Types.TINYINT) {
                                 return DbColumnType.INTEGER;
                             }
                             return typeRegistry.getColumnType(metaInfo);
@@ -261,7 +291,7 @@ public class CodeGenerator {
                         .service("/templates/service.java.vm")
                         .serviceImpl("/templates/serviceImpl.java.vm")
                         .mapper("/templates/mapper.java.vm")
-                        .xml(null) // 使用 MP 默认 XML 模板
+                        .xml(null)
                 )
                 .templateEngine(new VelocityTemplateEngine())
                 .execute();
@@ -275,7 +305,7 @@ public class CodeGenerator {
 - [ ] **Step 2：提交**
 
 ```bash
-git add xtx-core/src/main/java/com/leejie/xtx/core/generator/CodeGenerator.java
+git add xtx-code-generator/src/main/java/com/leejie/xtx/generator/CodeGenerator.java
 git commit -m "feat(generator): 重写 CodeGenerator，使用自定义 VM 模板适配基类体系"
 ```
 
@@ -284,10 +314,10 @@ git commit -m "feat(generator): 重写 CodeGenerator，使用自定义 VM 模板
 ### Task 4: 创建 DTO/Controller 的 VM 模板
 
 **Files:**
-- Create: `xtx-core/src/main/resources/templates/dto/CreateReq.java.vm`
-- Create: `xtx-core/src/main/resources/templates/dto/UpdateReq.java.vm`
-- Create: `xtx-core/src/main/resources/templates/dto/VO.java.vm`
-- Create: `xtx-core/src/main/resources/templates/dto/Controller.java.vm`
+- Create: `xtx-code-generator/src/main/resources/templates/dto/CreateReq.java.vm`
+- Create: `xtx-code-generator/src/main/resources/templates/dto/UpdateReq.java.vm`
+- Create: `xtx-code-generator/src/main/resources/templates/dto/VO.java.vm`
+- Create: `xtx-code-generator/src/main/resources/templates/dto/Controller.java.vm`
 
 **Interfaces:**
 - Consumes: 模板变量 `{packageName, className, tableComment, fields}`（由 DtoGenerator 传入）
@@ -454,7 +484,7 @@ public class ${className} {
 - [ ] **Step 5：提交**
 
 ```bash
-git add xtx-core/src/main/resources/templates/dto/
+git add xtx-code-generator/src/main/resources/templates/dto/
 git commit -m "feat(generator): 添加 DTO/Controller 的 VM 模板"
 ```
 
@@ -463,7 +493,7 @@ git commit -m "feat(generator): 添加 DTO/Controller 的 VM 模板"
 ### Task 5: 实现 DtoGenerator.java
 
 **Files:**
-- Create: `xtx-core/src/main/java/com/leejie/xtx/core/generator/DtoGenerator.java`
+- Create: `xtx-code-generator/src/main/java/com/leejie/xtx/generator/DtoGenerator.java`
 
 **Interfaces:**
 - Consumes: `String[] tables`（表名数组），数据库连接信息（与 CodeGenerator 共享）
@@ -472,10 +502,8 @@ git commit -m "feat(generator): 添加 DTO/Controller 的 VM 模板"
 - [ ] **Step 1：编写 DtoGenerator.java**
 
 ```java
-package com.leejie.xtx.core.generator;
+package com.leejie.xtx.generator;
 
-import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.generator.config.rules.DbColumnType;
 import org.apache.velocity.Template;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
@@ -526,13 +554,13 @@ public class DtoGenerator {
         TYPE_MAP.put("SMALLINT", "Integer");
         TYPE_MAP.put("BIGINT", "Long");
         TYPE_MAP.put("BIGINT UNSIGNED", "Long");
-        TYPE_MAP.put("DECIMAL", "java.math.BigDecimal");
+        TYPE_MAP.put("DECIMAL", "BigDecimal");
         TYPE_MAP.put("FLOAT", "Float");
         TYPE_MAP.put("DOUBLE", "Double");
-        TYPE_MAP.put("DATE", "java.time.LocalDate");
-        TYPE_MAP.put("DATETIME", "java.time.LocalDateTime");
-        TYPE_MAP.put("TIMESTAMP", "java.time.LocalDateTime");
-        TYPE_MAP.put("TIME", "java.time.LocalTime");
+        TYPE_MAP.put("DATE", "LocalDate");
+        TYPE_MAP.put("DATETIME", "LocalDateTime");
+        TYPE_MAP.put("TIMESTAMP", "LocalDateTime");
+        TYPE_MAP.put("TIME", "LocalTime");
         TYPE_MAP.put("BOOLEAN", "Boolean");
         TYPE_MAP.put("BLOB", "byte[]");
         TYPE_MAP.put("JSON", "String");
@@ -540,7 +568,6 @@ public class DtoGenerator {
 
     public static void generate(String... tables) {
         VelocityEngine engine = createVelocityEngine();
-        String projectPath = System.getProperty("user.dir");
 
         try (Connection conn = DriverManager.getConnection(URL, USERNAME, PASSWORD)) {
             for (String tableName : tables) {
@@ -557,43 +584,42 @@ public class DtoGenerator {
     }
 
     private static void generateForTable(Connection conn, VelocityEngine engine, String tableName) throws Exception {
-        // 1. 读取表注释
         String tableComment = getTableComment(conn, tableName);
-
-        // 2. 读取列信息（排除基类字段）
         List<FieldInfo> columns = getColumns(conn, tableName);
-
-        // 3. 构建类名
-        String entityName = toPascalCase(tableName) + "Entity";
+        String entityName = toPascalCase(tableName);
         String className = toPascalCase(tableName);
 
-        // 4. 生成 CreateReq
-        renderDto(engine, "dto/CreateReq.java.vm", DTO_PACKAGE,
-                className + "CreateReq", tableComment, filterCreateFields(columns));
+        // 生成 CreateReq
+        renderDto(engine, "/templates/dto/CreateReq.java.vm", DTO_PACKAGE,
+                className + "CreateReq", tableComment, filterCreateFields(columns),
+                entityName, ENTITY_PACKAGE + "." + entityName);
 
-        // 5. 生成 UpdateReq
-        renderDto(engine, "dto/UpdateReq.java.vm", DTO_PACKAGE,
-                className + "UpdateReq", tableComment, filterUpdateFields(columns));
+        // 生成 UpdateReq
+        renderDto(engine, "/templates/dto/UpdateReq.java.vm", DTO_PACKAGE,
+                className + "UpdateReq", tableComment, filterUpdateFields(columns),
+                entityName, ENTITY_PACKAGE + "." + entityName);
 
-        // 6. 生成 VO（包含所有业务字段 + id）
-        renderDto(engine, "dto/VO.java.vm", DTO_PACKAGE,
-                className + "VO", tableComment, getAllVoFields(conn, tableName, columns));
+        // 生成 VO（包含所有业务字段 + id）
+        renderDto(engine, "/templates/dto/VO.java.vm", DTO_PACKAGE,
+                className + "VO", tableComment, getAllVoFields(conn, tableName, columns),
+                entityName, ENTITY_PACKAGE + "." + entityName);
 
-        // 7. 生成 Controller
+        // 生成 Controller
         renderController(engine, tableName, className, tableComment, entityName);
     }
 
     private static void renderDto(VelocityEngine engine, String templatePath,
                                   String packageName, String className,
-                                  String tableComment, List<FieldInfo> fields) throws Exception {
+                                  String tableComment, List<FieldInfo> fields,
+                                  String entityName, String entityFullName) throws Exception {
         VelocityContext ctx = new VelocityContext();
         ctx.put("packageName", packageName);
         ctx.put("className", className);
         ctx.put("tableComment", tableComment != null ? tableComment : className);
         ctx.put("fields", fields);
-        // VO 模板需要额外变量
-        ctx.put("entityFullName", ENTITY_PACKAGE + "." + toPascalCase(className.replace("VO", "").replace("CreateReq", "").replace("UpdateReq", "")) + "Entity");
-        ctx.put("entityName", toPascalCase(className.replace("VO", "").replace("CreateReq", "").replace("UpdateReq", "")) + "Entity");
+        ctx.put("entityName", entityName);
+        ctx.put("entityFullName", entityFullName);
+        ctx.put("imports", collectImports(fields));
 
         String outputPath = OUTPUT_DIR + "/" + packageName.replace('.', '/') + "/" + className + ".java";
         ensureParentDir(outputPath);
@@ -609,13 +635,15 @@ public class DtoGenerator {
     private static void renderController(VelocityEngine engine, String tableName,
                                          String className, String tableComment,
                                          String entityName) throws Exception {
+        String serviceVar = toCamelCase(className) + "Service";
+
         VelocityContext ctx = new VelocityContext();
         ctx.put("packageName", CONTROLLER_PACKAGE);
         ctx.put("className", className + "Controller");
         ctx.put("tableComment", tableComment != null ? tableComment : className);
         ctx.put("mapping", toKebabCase(tableName));
         ctx.put("serviceName", className + "Service");
-        ctx.put("serviceVar", toCamelCase(className) + "Service");
+        ctx.put("serviceVar", serviceVar);
         ctx.put("serviceFullName", SERVICE_PACKAGE + "." + className + "Service");
         ctx.put("createReqName", className + "CreateReq");
         ctx.put("createReqFullName", DTO_PACKAGE + "." + className + "CreateReq");
@@ -628,7 +656,7 @@ public class DtoGenerator {
         ensureParentDir(outputPath);
 
         try (Writer writer = new FileWriter(outputPath)) {
-            Template template = engine.getTemplate("dto/Controller.java.vm", "UTF-8");
+            Template template = engine.getTemplate("/templates/dto/Controller.java.vm", "UTF-8");
             template.merge(ctx, writer);
         }
 
@@ -663,7 +691,6 @@ public class DtoGenerator {
                     String columnName = rs.getString("COLUMN_NAME");
                     String javaName = toCamelCase(columnName);
 
-                    // 排除基类字段
                     if (BASE_FIELDS.contains(javaName)) {
                         continue;
                     }
@@ -681,23 +708,18 @@ public class DtoGenerator {
         return fields;
     }
 
-    /** CreateReq 排除主键字段 */
     private static List<FieldInfo> filterCreateFields(List<FieldInfo> fields) {
         return fields.stream().filter(f -> !f.isPk).toList();
     }
 
-    /** UpdateReq 包含主键（在模板中硬编码 id 字段），排除其他基类字段已由 getColumns 处理 */
     private static List<FieldInfo> filterUpdateFields(List<FieldInfo> fields) {
         return fields.stream().filter(f -> !f.isPk).toList();
     }
 
-    /** VO 包含所有字段（包括主键 id，但不含 deleted 等基类字段） */
     private static List<FieldInfo> getAllVoFields(Connection conn, String tableName,
                                                   List<FieldInfo> businessFields) throws SQLException {
-        // VO 只需要业务字段 + id（id 已被 BASE_FIELDS 排除，需要单独查询）
         List<FieldInfo> allFields = new ArrayList<>();
 
-        // 查询 id 字段
         String sql = "SELECT COLUMN_NAME, DATA_TYPE, COLUMN_COMMENT " +
                 "FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? " +
                 "AND COLUMN_KEY = 'PRI' ORDER BY ORDINAL_POSITION";
@@ -764,9 +786,28 @@ public class DtoGenerator {
         }
     }
 
+    /** 计算字段类型需要的额外 import（java.time / java.math） */
+    private static List<String> collectImports(List<FieldInfo> fields) {
+        Map<String, String> typeToImport = new HashMap<>();
+        typeToImport.put("BigDecimal", "java.math.BigDecimal");
+        typeToImport.put("LocalDate", "java.time.LocalDate");
+        typeToImport.put("LocalDateTime", "java.time.LocalDateTime");
+        typeToImport.put("LocalTime", "java.time.LocalTime");
+
+        List<String> imports = new ArrayList<>();
+        for (FieldInfo f : fields) {
+            String imp = typeToImport.get(f.type);
+            if (imp != null && !imports.contains(imp)) {
+                imports.add(imp);
+            }
+        }
+        Collections.sort(imports);
+        return imports;
+    }
+
     // ---- 内部类 ----
 
-    static class FieldInfo {
+    public static class FieldInfo {
         final String name;
         final String type;
         final String comment;
@@ -793,7 +834,7 @@ public class DtoGenerator {
 - [ ] **Step 2：提交**
 
 ```bash
-git add xtx-core/src/main/java/com/leejie/xtx/core/generator/DtoGenerator.java
+git add xtx-code-generator/src/main/java/com/leejie/xtx/generator/DtoGenerator.java
 git commit -m "feat(generator): 实现 DtoGenerator — JDBC + Velocity 生成 DTO/Controller"
 ```
 
@@ -812,14 +853,14 @@ git commit -m "feat(generator): 实现 DtoGenerator — JDBC + Velocity 生成 D
 - [ ] **Step 2：编译项目**
 
 ```bash
-mvn compile -pl xtx-core -am -q
+mvn compile -pl xtx-code-generator -am -q
 ```
 
 - [ ] **Step 3：运行 CodeGenerator.main()**
 
 在 IDE 中运行 `CodeGenerator.main()`，或在命令行：
 ```bash
-mvn exec:java -pl xtx-core -Dexec.mainClass="com.leejie.xtx.core.generator.CodeGenerator" -Dexec.classpathScope=compile
+mvn exec:java -pl xtx-code-generator -Dexec.mainClass="com.leejie.xtx.generator.CodeGenerator" -Dexec.classpathScope=compile
 ```
 
 - [ ] **Step 4：检查生成的文件**
@@ -849,9 +890,7 @@ xtx-core/src/main/java/com/leejie/xtx/core/controller/RecordController.java
 
 ```bash
 mvn compile -pl xtx-core -am
-```
-
-- [ ] **Step 7：全部提交**
+```- [ ] **Step 7：全部提交**
 
 ```bash
 git add -A
