@@ -6,6 +6,9 @@ server:
 spring:
   application:
     name: xtx-api
+  # dev profile 是 DevTokenController 注册的前提，生产环境不要激活
+  profiles:
+    active: dev
   datasource:
     url: jdbc:mysql://localhost:3306/xtx?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: leejie
