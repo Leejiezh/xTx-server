@@ -7,6 +7,7 @@ import lombok.Data;
 import org.springframework.beans.BeanUtils;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Schema(description = "记录表更新请求")
 @Data
@@ -22,8 +23,8 @@ public class RecordUpdateReq {
     @Schema(description = "文字内容")
     @NotNull(message = "文字内容不能为空")
     private String content;
-    @Schema(description = "图片URL数组")
-    private String images;
+    @Schema(description = "图片objectKey数组")
+    private List<String> images;
     @Schema(description = "记录日期(支持补记)")
     @NotNull(message = "记录日期(支持补记)不能为空")
     private LocalDate recordDate;

@@ -6,6 +6,8 @@ import com.leejie.xtx.common.result.R;
 import com.leejie.xtx.core.dto.RecordCreateReq;
 import com.leejie.xtx.core.dto.RecordUpdateReq;
 import com.leejie.xtx.core.dto.RecordVO;
+import com.leejie.xtx.core.entity.Record;
+import com.leejie.xtx.core.service.FileService;
 import com.leejie.xtx.core.service.RecordService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,6 +15,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 记录表接口。
+ *
+ * <p>出站前必须把 images 里的 objectKey 换成预签名 access URL：库里存的是永久
+ * objectKey，桶是私有的，直接返给小程序取不到图（见 ADR-0002）。
+ */
 @Tag(name = "记录表管理")
 @RestController
 @RequestMapping("/record")
@@ -20,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class RecordController {
 
     private final RecordService recordService;
+    private final FileService fileService;
 
     @PostMapping
     @Operation(summary = "创建记录表")
@@ -30,7 +39,7 @@ public class RecordController {
     @GetMapping("/{id}")
     @Operation(summary = "查询记录表详情")
     public R<RecordVO> get(@PathVariable Long id) {
-        return R.ok(RecordVO.fromEntity(recordService.get(id)));
+        return R.ok(toVO(recordService.get(id)));
     }
 
     @PutMapping
@@ -50,6 +59,12 @@ public class RecordController {
     @GetMapping("/page")
     @Operation(summary = "分页查询记录表")
     public R<PageResult<RecordVO>> page(PageQuery query) {
-        return R.ok(PageResult.of(recordService.page(query, null), RecordVO::fromEntity));
+        return R.ok(PageResult.of(recordService.page(query, null), this::toVO));
+    }
+
+    private RecordVO toVO(Record entity) {
+        RecordVO vo = RecordVO.fromEntity(entity);
+        vo.setImages(fileService.accessUrls(vo.getImages()));
+        return vo;
     }
 }

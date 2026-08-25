@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS `record` (
     `user_id`     BIGINT       NOT NULL                 COMMENT '用户ID',
     `category`    VARCHAR(16)  NOT NULL                 COMMENT '分类:LIFE/STUDY',
     `content`     TEXT         NOT NULL                 COMMENT '文字内容',
-    `images`      JSON         DEFAULT NULL             COMMENT '图片URL数组',
+    `images`      JSON         DEFAULT NULL             COMMENT '图片objectKey数组(非URL,读时签发access URL)',
     `record_date` DATE         NOT NULL                 COMMENT '记录日期(支持补记)',
     `source`      VARCHAR(16)  NOT NULL DEFAULT 'MANUAL' COMMENT '来源:MANUAL/IMAGE',
     `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -68,3 +68,26 @@ CREATE TABLE IF NOT EXISTS `report`
     KEY `idx_user_created` (`user_id`, `created_at`, `deleted`),
     KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报告表';
+
+
+-- ========================================
+-- 4. 文件元数据表
+--
+-- 不继承 OwnedEntity：主键是 object_key 而非自增 id，且无 deleted 列
+-- —— 孤儿清理任务要物理删行（连带删 MinIO 对象），逻辑删除会让已删对象的行永久滞留。
+-- 因此归属校验在 FileServiceImpl 里手写，不走 OwnedServiceImpl。
+-- ========================================
+CREATE TABLE IF NOT EXISTS `file_metadata` (
+    `object_key`        VARCHAR(256) NOT NULL                COMMENT '对象键(主键)',
+    `user_id`           BIGINT       NOT NULL                COMMENT '用户ID',
+    `original_filename` VARCHAR(256) DEFAULT NULL            COMMENT '原始文件名(下载时用于Content-Disposition)',
+    `content_type`      VARCHAR(128) DEFAULT NULL            COMMENT '内容类型',
+    `size`              BIGINT       DEFAULT NULL            COMMENT '文件大小(字节)',
+    `status`            VARCHAR(16)  NOT NULL DEFAULT 'TEMP' COMMENT '状态:TEMP/ATTACHED/DETACHED',
+    `record_id`         BIGINT       DEFAULT NULL            COMMENT '关联记录ID(ATTACHED时非空)',
+    `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    `attached_at`       DATETIME     DEFAULT NULL            COMMENT '附加时间',
+    PRIMARY KEY (`object_key`),
+    KEY `idx_user_status_created` (`user_id`, `status`, `created_at`),
+    KEY `idx_record_id` (`record_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件元数据表';

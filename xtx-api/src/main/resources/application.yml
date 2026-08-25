@@ -32,9 +32,29 @@ mybatis-plus:
 
 minio:
   endpoint: http://localhost:9000
-  access-key: minioadmin
-  secret-key: minioadmin
+  access-key: xtx-minio
+  secret-key: admin123
   bucket: xtx
+
+file:
+  image-types:
+    - image/jpeg
+    - image/png
+    - image/webp
+    - image/gif
+  document-types:
+    - application/pdf
+    - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+    - application/vnd.openxmlformats-officedocument.presentationml.presentation
+    - text/plain
+    - application/zip
+  image-max-size: 10485760
+  document-max-size: 52428800
+  presigned-put-expiry: 900
+  # MinIO 预签名 URL 上限 7 天，不可再调大
+  presigned-get-expiry: 604800
+  orphan-grace-hours: 24
 
 wechat:
   app-id: your-app-id
