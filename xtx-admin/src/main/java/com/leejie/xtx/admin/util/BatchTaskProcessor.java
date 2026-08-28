@@ -1,4 +1,4 @@
-package com.leejie.xtx.admin.controller;
+package com.leejie.xtx.admin.util;
 
 import java.util.ArrayList;
 import java.util.List;
