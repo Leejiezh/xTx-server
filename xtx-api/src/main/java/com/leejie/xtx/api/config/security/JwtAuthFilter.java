@@ -39,9 +39,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             try {
                 Claims claims = JwtUtils.parse(authHeader.substring(Constants.TOKEN_PREFIX.length()));
 
-                // 不能写 claims.get("userId", Long.class)：JSON 数字反序列化后小值是 Integer，
+                // 不能写 claims.get(CLAIM_USER_ID, Long.class)：JSON 数字反序列化后小值是 Integer，
                 // jjwt 会抛类型不匹配。且 principal 必须是 Long —— SecurityUtils 用 instanceof Long 取值。
-                Long userId = ((Number) claims.get("userId")).longValue();
+                Long userId = ((Number) claims.get(Constants.CLAIM_USER_ID)).longValue();
 
                 SecurityContextHolder.getContext().setAuthentication(
                         new UsernamePasswordAuthenticationToken(userId, null, List.of()));

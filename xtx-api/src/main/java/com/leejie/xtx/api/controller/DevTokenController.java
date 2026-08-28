@@ -1,5 +1,6 @@
 package com.leejie.xtx.api.controller;
 
+import com.leejie.xtx.common.constant.Constants;
 import com.leejie.xtx.common.jwt.JwtUtils;
 import com.leejie.xtx.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,10 +32,10 @@ public class DevTokenController {
     @GetMapping("/dev-token")
     @Operation(summary = "签发调试用 token（仅 dev profile）")
     public R<String> devToken(@RequestParam(defaultValue = "1") Long userId) {
-        // claim 名 "userId" 必须与 JwtAuthFilter 读取的 key 一致
+        // claim key 统一收在 Constants，签发与解析两侧必须一致
         return R.ok(JwtUtils.generate(Map.of(
-                "userId", userId,
-                "openid", "dev-openid-" + userId
+                Constants.CLAIM_USER_ID, userId,
+                Constants.CLAIM_OPENID, "dev-openid-" + userId
         )));
     }
 }
