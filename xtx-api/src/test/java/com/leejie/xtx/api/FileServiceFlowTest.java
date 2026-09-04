@@ -39,11 +39,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 端到端：presign → 前端 PUT 直传 MinIO → attach 校验真实大小 → accessUrl 取回 → delete。
+ * 端到端：presign → 前端 POST 表单直传 MinIO → attach 校验真实大小 → accessUrl 取回 → delete。
  *
  * <p>需要本地 MinIO 运行（与 xtx-admin 的 MinioConnectivityTest 同一前提），
  * 但**不需要 MySQL**：file_metadata 用内存 Map 替身，因为这个测试要验证的是
- * 预签名 URL 真能被 HTTP 客户端直传/直取，而不是 MyBatis 映射。
+ * 预签名表单真能被 HTTP 客户端直传/直取，而不是 MyBatis 映射。
  *
  * <p>只加载 {@link MinioConfig} + {@link FileProperties}，不启完整上下文
  * —— 完整上下文目前因认证链路未接通而起不来（既有问题，与文件服务无关）。
@@ -105,23 +105,29 @@ class FileServiceFlowTest {
     }
 
     @Test
-    @DisplayName("预签名直传全流程：presign → PUT → attach → accessUrl → delete")
+    @DisplayName("预签名表单直传全流程：presign → POST → attach → accessUrl → delete")
     void presignedUploadRoundTrip() throws Exception {
         byte[] payload = "hello-minio".getBytes(StandardCharsets.UTF_8);
 
         PresignResp presign = fileService.presign(
                 new PresignReq("image/jpeg", (long) payload.length, "封面.jpg"));
-        assertNotNull(presign.putUrl());
+        assertNotNull(presign.postUrl());
+        assertNotNull(presign.formData());
         assertTrue(presign.objectKey().startsWith("img/" + USER_ID + "/"), presign.objectKey());
+        assertEquals(presign.objectKey(), presign.formData().get("key"));
+        assertEquals("image/jpeg", presign.formData().get("Content-Type"));
         assertEquals("TEMP", rows.get(presign.objectKey()).getStatus());
 
+        String boundary = "XtxBoundary" + System.nanoTime();
+        byte[] multipart = buildMultipartBody(presign.formData(), "cover.jpg", payload, boundary);
         HttpClient http = HttpClient.newHttpClient();
-        HttpResponse<Void> put = http.send(
-                HttpRequest.newBuilder(URI.create(presign.putUrl()))
-                        .PUT(HttpRequest.BodyPublishers.ofByteArray(payload))
+        HttpResponse<Void> post = http.send(
+                HttpRequest.newBuilder(URI.create(presign.postUrl()))
+                        .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                        .POST(HttpRequest.BodyPublishers.ofByteArray(multipart))
                         .build(),
                 HttpResponse.BodyHandlers.discarding());
-        assertEquals(200, put.statusCode(), "预签名 PUT 应直传成功");
+        assertEquals(200, post.statusCode(), "POST 表单直传应成功");
 
         fileService.attach(999L, List.of(presign.objectKey()));
         FileMetadata attached = rows.get(presign.objectKey());
@@ -151,5 +157,27 @@ class FileServiceFlowTest {
 
         assertEquals(422, assertThrows(com.leejie.xtx.common.exception.BusinessException.class,
                 () -> fileService.attach(999L, List.of(presign.objectKey()))).getCode());
+    }
+
+    /** 按 S3 POST 表单拼 multipart body：formData 各字段作文本字段 + file 放二进制 */
+    private static byte[] buildMultipartBody(Map<String, String> fields, String filename,
+                                             byte[] payload, String boundary) {
+        StringBuilder head = new StringBuilder();
+        for (Map.Entry<String, String> e : fields.entrySet()) {
+            head.append("--").append(boundary).append("\r\n")
+                    .append("Content-Disposition: form-data; name=\"").append(e.getKey()).append("\"\r\n\r\n")
+                    .append(e.getValue()).append("\r\n");
+        }
+        head.append("--").append(boundary).append("\r\n")
+                .append("Content-Disposition: form-data; name=\"file\"; filename=\"").append(filename).append("\"\r\n")
+                .append("Content-Type: application/octet-stream\r\n\r\n");
+        byte[] headBytes = head.toString().getBytes(StandardCharsets.UTF_8);
+        byte[] tailBytes = ("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8);
+
+        byte[] body = new byte[headBytes.length + payload.length + tailBytes.length];
+        System.arraycopy(headBytes, 0, body, 0, headBytes.length);
+        System.arraycopy(payload, 0, body, headBytes.length, payload.length);
+        System.arraycopy(tailBytes, 0, body, headBytes.length + payload.length, tailBytes.length);
+        return body;
     }
 }

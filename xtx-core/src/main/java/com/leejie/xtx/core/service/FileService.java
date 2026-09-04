@@ -10,7 +10,7 @@ import java.util.List;
 /**
  * 文件服务。
  *
- * <p>两条上传路径（见 ADR-0001）：图片走 {@link #presign} 由前端直传 MinIO，
+ * <p>两条上传路径（见 ADR-0001）：图片走 {@link #presign} 由前端拿 S3 POST 表单直传 MinIO，
  * 不经后端字节；非图片走 {@link #upload} 后端代理，以便校验并留下原始文件名。
  *
  * <p>DB 永久存 objectKey，读时才现签发 access URL（见 ADR-0002）——
@@ -23,7 +23,8 @@ import java.util.List;
 public interface FileService {
 
     /**
-     * 图片预签名直传：校验后生成 objectKey、落一条 TEMP 元数据、返回预签名 PUT URL。
+     * 图片预签名直传：校验后生成 objectKey、落一条 TEMP 元数据、返回 S3 POST 表单
+     * （{@code postUrl + formData}，配合小程序 {@code wx.uploadFile} 直传）。
      *
      * @throws com.leejie.xtx.common.exception.BusinessException 422，类型不在白名单或声明大小超限
      */

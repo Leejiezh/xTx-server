@@ -8,9 +8,8 @@ import com.leejie.xtx.core.dto.PresignReq;
 import com.leejie.xtx.core.dto.PresignResp;
 import com.leejie.xtx.core.entity.FileMetadata;
 import com.leejie.xtx.core.mapper.FileMetadataMapper;
-import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
-import io.minio.http.Method;
+import io.minio.PostPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +17,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -88,23 +90,28 @@ class FileServiceImplPresignTest {
     }
 
     @Test
-    @DisplayName("presign 成功：返回 PUT URL 与 objectKey，并落一条 TEMP 元数据")
+    @DisplayName("presign 成功：返回 POST 表单与 objectKey，并落一条 TEMP 元数据")
     void presign_ok_returnsUrlAndKeyAndInsertsTemp() throws Exception {
         when(currentUser.currentUserId()).thenReturn(42L);
         when(minioConfig.getBucket()).thenReturn("xtx");
-        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class))).thenReturn("http://put-url");
+        when(minioConfig.getEndpoint()).thenReturn("http://localhost:9000");
+        when(minioClient.getPresignedPostFormData(any(PostPolicy.class)))
+                .thenReturn(new HashMap<>(Map.of("policy", "p", "x-amz-signature", "sig")));
 
         PresignResp resp = fileService.presign(req("image/jpeg", 1024L, "photo.jpg"));
 
-        assertEquals("http://put-url", resp.putUrl());
+        assertEquals("http://localhost:9000/xtx", resp.postUrl());
         assertNotNull(resp.expiresAt());
         assertTrue(resp.objectKey().startsWith("img/42/"), "objectKey 应以 img/{userId}/ 开头");
         assertTrue(resp.objectKey().endsWith(".jpg"));
+        // SDK 返回的 formData 不含 key/Content-Type，后端须补齐才能通过 MinIO 表单校验
+        assertEquals(resp.objectKey(), resp.formData().get("key"));
+        assertEquals("image/jpeg", resp.formData().get("Content-Type"));
+        assertEquals("p", resp.formData().get("policy"));
 
-        ArgumentCaptor<GetPresignedObjectUrlArgs> argsCap = ArgumentCaptor.forClass(GetPresignedObjectUrlArgs.class);
-        verify(minioClient).getPresignedObjectUrl(argsCap.capture());
-        assertEquals(Method.PUT, argsCap.getValue().method());
-        assertEquals(resp.objectKey(), argsCap.getValue().object());
+        ArgumentCaptor<PostPolicy> policyCap = ArgumentCaptor.forClass(PostPolicy.class);
+        verify(minioClient).getPresignedPostFormData(policyCap.capture());
+        assertEquals("xtx", policyCap.getValue().bucket());
 
         ArgumentCaptor<FileMetadata> metaCap = ArgumentCaptor.forClass(FileMetadata.class);
         verify(fileMetadataMapper).insert(metaCap.capture());
@@ -122,7 +129,9 @@ class FileServiceImplPresignTest {
     void presign_sanitizesExtensionFromHostileFilename() throws Exception {
         when(currentUser.currentUserId()).thenReturn(7L);
         when(minioConfig.getBucket()).thenReturn("xtx");
-        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class))).thenReturn("http://put-url");
+        when(minioConfig.getEndpoint()).thenReturn("http://localhost:9000");
+        when(minioClient.getPresignedPostFormData(any(PostPolicy.class)))
+                .thenReturn(new HashMap<>());
 
         PresignResp resp = fileService.presign(req("image/png", 10L, "evil.p/../../ng"));
 

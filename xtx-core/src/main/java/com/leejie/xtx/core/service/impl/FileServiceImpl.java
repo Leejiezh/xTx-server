@@ -14,6 +14,7 @@ import com.leejie.xtx.core.mapper.FileMetadataMapper;
 import com.leejie.xtx.core.service.FileService;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
+import io.minio.PostPolicy;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
 import io.minio.StatObjectArgs;
@@ -29,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -77,12 +79,11 @@ public class FileServiceImpl implements FileService {
         }
 
         String objectKey = buildObjectKey(PREFIX_IMAGE, userId, req.contentType(), req.originalFilename());
-        // 先签 URL 再落库：反序则 URL 已签出而元数据缺失，前端能传上一个后端认不出的对象
-        String putUrl = presignedPutUrl(objectKey);
+        // 先签表单再落库：反序则表单已签出而元数据缺失，前端能传上一个后端认不出的对象
+        PresignResp resp = buildPostForm(objectKey, req.contentType());
         insertTemp(objectKey, userId, req.originalFilename(), req.contentType(), req.size());
 
-        long expiresAt = System.currentTimeMillis() + fileProperties.getPresignedPutExpiry() * 1000L;
-        return new PresignResp(putUrl, objectKey, expiresAt);
+        return resp;
     }
 
     @Override
@@ -352,17 +353,33 @@ public class FileServiceImpl implements FileService {
         fileMetadataMapper.update(null, wrapper);
     }
 
-    private String presignedPutUrl(String objectKey) {
+    /**
+     * S3 POST 表单直传，配合小程序 {@code wx.uploadFile}（它只能发 multipart POST，发不了 PUT）。
+     *
+     * <p>SDK 返回的 formData 只含 policy/x-amz-* /signature，**不含 key 与 Content-Type**——
+     * 这两个字段以 eq 条件进了 policy，form 里必须带同名字段才能通过 MinIO 校验，故这里补齐。
+     */
+    private PresignResp buildPostForm(String objectKey, String contentType) {
         try {
-            return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
-                    .method(Method.PUT)
-                    .bucket(minioConfig.getBucket())
-                    .object(objectKey)
-                    .expiry(fileProperties.getPresignedPutExpiry())
-                    .build());
+            PostPolicy policy = new PostPolicy(minioConfig.getBucket(),
+                    ZonedDateTime.now().plusSeconds(fileProperties.getPresignedPutExpiry()));
+            policy.addEqualsCondition("key", objectKey);
+            policy.addEqualsCondition("Content-Type", contentType);
+
+            Map<String, String> formData = minioClient.getPresignedPostFormData(policy);
+            formData.put("key", objectKey);
+            formData.put("Content-Type", contentType);
+
+            long expiresAt = System.currentTimeMillis() + fileProperties.getPresignedPutExpiry() * 1000L;
+            return new PresignResp(postUrl(), formData, objectKey, expiresAt);
         } catch (Exception e) {
-            throw new BusinessException("生成上传URL失败: " + e.getMessage());
+            throw new BusinessException("生成上传表单失败: " + e.getMessage());
         }
+    }
+
+    private String postUrl() {
+        // endpoint 可能带尾斜杠，规整后再拼 bucket
+        return minioConfig.getEndpoint().replaceAll("/+$", "") + "/" + minioConfig.getBucket();
     }
 
     private String presignedGetUrl(String objectKey, FileMetadata meta, boolean download) {
