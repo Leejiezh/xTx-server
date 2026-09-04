@@ -1,5 +1,7 @@
 # MinIO 文件服务 Implementation Plan
 
+> **落地差异（2026-09-04）**：presign 已从「PUT 预签名 URL」改为「S3 POST 表单直传」——`PresignResp` 现为 `postUrl` + `formData`，配合 uniapp 的 `uni.uploadFile`（它只能发 multipart POST）。本文件正文里所有 `putUrl` / `presignedPutUrl` / `Method.PUT` 细节仅作历史参考，以 ADR-0001 与代码为准。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在 xtx-core/xtx-api 中实现 MinIO 文件服务：图片预签名直传 + 非图片后端代理上传 + 私有桶读时签发访问 URL + file_metadata 生命周期管理 + 孤儿文件定时清理，并打通 Record.images 的存取。

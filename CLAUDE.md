@@ -28,6 +28,10 @@ mvn test
 
 各启动模块（xtx-api / xtx-admin）有 `@SpringBootTest` 冒烟测试；业务逻辑测试见各模块 `src/test`。
 
+## 开发约定
+
+- 涉及 uniapp 前端、微信小程序接口（`wx.*` / `uni.*`）时，**先查一次官方文档**再写代码或下结论——接口请求方式/参数/限制以官方文档为准，详见 `.claude/rules/api-docs.md`。
+
 ## 模块结构与依赖方向
 
 ```
@@ -42,7 +46,7 @@ xtx-code-generator (代码生成器，独立工具模块，不参与部署) ─>
 - **xtx-common**：不依赖任何内部模块，承载整套基类体系（见下）。
 - **xtx-wechat**：微信小程序集成，目前只有 `WechatLoginService` 接口 + `WechatConfig` 配置，登录实现与用户表 CRUD 尚未落地。
 - **xtx-core**：业务实体/dto/mapper/service/controller 的所在地，含 MyBatis-Plus / Redis / MinIO 配置。`@MapperScan` 在 `MyBatisPlusConfig` 里（`com.leejie.xtx.core.**.mapper`）。
-- **xtx-api**：依赖 spring-boot-starter-security，注册了 `JwtAuthInterceptor`。`@ComponentScan("com.leejie.xtx")` 全量扫描，保证 xtx-core/xtx-wechat 的 Bean 能被装配。
+- **xtx-api**：依赖 spring-boot-starter-security，`SecurityConfig` 配置无状态 JWT 认证（见「当前未完成 / 易踩坑」的认证链路说明）。`@ComponentScan("com.leejie.xtx")` 全量扫描，保证 xtx-core/xtx-wechat 的 Bean 能被装配。
 - **xtx-admin**：最小启动模块，仅一个 HealthController。
 
 启动模块的 `application.yml` 中 MySQL/Redis/MinIO 连接信息为本地开发值（用户名密码是 leejie/123456，Redis 密码 123456）。
@@ -68,6 +72,13 @@ xtx-code-generator (代码生成器，独立工具模块，不参与部署) ─>
 - 统一响应 `R<T>`：`code/msg/data`，静态方法 `R.ok(...)` / `R.fail(...)`。
 - 业务异常用 `BusinessException(code, msg)`，由 `GlobalExceptionHandler`（xtx-common 的 `@RestControllerAdvice`）统一转成 `R`。
 
+## 文件上传（MinIO）
+
+- 两条路径（见 ADR-0001）：**图片走 `FileService.presign` 拿 S3 POST 表单（`postUrl` + `formData`），前端用 `uni.uploadFile` 直传 MinIO**，不经后端字节；非图片走 `upload` 后端代理。
+- **前端是 uniapp，`uni.uploadFile`（底层 `wx.uploadFile`）只能发 multipart POST、发不了 PUT**——因此 presign 返回 POST 表单而非 PUT URL。SDK 生成的 `formData` 只含 `policy`/`x-amz-*`/`signature`，后端已把 `key`、`Content-Type` 补齐（FileServiceImpl.buildPostForm），前端把 `formData` 原样塞进 `uni.uploadFile` 即可，不要自己拼签名、不要带 Authorization header（直传目标是 MinIO 不是后端）。
+- DB 永久存 objectKey，读时现签发 presigned GET（ADR-0002），图片不因 URL 过期而裂。
+- `file_metadata` 状态机 TEMP → ATTACHED → DETACHED；超 24h 宽限期的 TEMP/DETACHED 由 `OrphanFileSweeper` 清理（ADR-0003）。本地 docker 只起了 MySQL+Redis，跑文件相关集成测试需另起 MinIO。
+
 ## 代码生成器（xtx-code-generator）
 
 为已有表生成全套 CRUD 代码，**自动适配上述基类体系**：Entity 继承 `OwnedEntity`、Service 继承 `OwnedService`、ServiceImpl 继承 `OwnedServiceImpl`。生成方案与字段映射规则见 `docs/superpowers/specs/2026-08-07-mp-code-generator-design.md`。
@@ -81,8 +92,8 @@ xtx-code-generator (代码生成器，独立工具模块，不参与部署) ─>
 
 ## 当前未完成 / 易踩坑
 
-- **Spring Security 认证链路未真正接通**：xtx-api 引入了 security 依赖、注册了 `JwtAuthInterceptor`，但**没有 SecurityConfig / JwtAuthFilter / UserController / 登录注册接口**。`SecurityUtils`（xtx-common 之外由 api 使用）从 SecurityContextHolder 取 userId，而其 javadoc 自述「Task 1 尚未实施」——当前 `JwtAuthInterceptor` 把 userId 放进 request attribute，与 SecurityUtils 的读取来源不一致。在实施认证链路前，接口实际无法完成登录态校验。
-- `WechatLoginService` 只有接口没有实现；AI 生成（Spring AI + 通义千问）未实现；MinIO 上传未接业务。
+- **JWT 认证链路已接通，但真正的微信登录未落地**：`SecurityConfig`（xtx-api）默认所有接口要求认证，仅 `/auth/**`、`/health/**`、swagger 免认证；`JwtAuthFilter` 解析 Bearer token，把 userId（Long）放进 SecurityContext 的 principal，`SecurityUtils` / `SecurityCurrentUserProvider` 从那里取，与 OwnedService/FileService 的 `currentUser.currentUserId()` 一致。本地自测用 `GET /api/auth/dev-token?userId=1`（仅 dev profile）签 token。**尚未落地的是微信登录**：`WechatLoginService` 只有接口，没有 jscode2session → 建/查 user → 签 token 的实现，也没有 UserController / 登录注册接口。
+- AI 生成（Spring AI + 通义千问）未实现。
 - 数据库密码等敏感配置直接写死在 `application.yml` 与 `Constants.TOKEN_SECRET`（注释标记 change-in-production）——属已知取舍，部署前需外置。
 
 --- 

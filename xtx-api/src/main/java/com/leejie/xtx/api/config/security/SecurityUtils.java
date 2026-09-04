@@ -7,9 +7,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 /**
  * 当前登录用户工具类。
  *
- * <p>内容取自 plan.md Task 1 Step 2。Task 1 尚未实施(SecurityConfig /
- * JwtAuthFilter 还没建)，这里先落地本类以便基类编译通过；
- * 实施 Task 1 时应以本文件为准，不要重复创建。
+ * <p>userId 由 {@code JwtAuthFilter} 放进 Authentication 的 principal（Long），
+ * 这里是 SecurityContext 的唯一读取出口，401 判定与「登录状态异常」兜底都集中在本类。
  */
 public class SecurityUtils {
 

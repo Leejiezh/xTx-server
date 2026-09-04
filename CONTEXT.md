@@ -9,7 +9,7 @@
 _避免_：URL、文件链接
 
 **Image（图片）**:
-content-type 为 `image/*` 的文件。前端通过预签名 PUT 直传 MinIO（不经后端字节），内联预览。
+content-type 为 `image/*` 的文件。前端用 S3 POST 表单直传 MinIO（`FileService.presign` 返回 `postUrl`+`formData`，`uni.uploadFile` 上传，不经后端字节），内联预览。
 _避免_：picture、photo
 
 **Document（文档）**:
