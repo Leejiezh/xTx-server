@@ -44,7 +44,7 @@ xtx-code-generator (代码生成器，独立工具模块，不参与部署) ─>
 ```
 
 - **xtx-common**：不依赖任何内部模块，承载整套基类体系（见下）。
-- **xtx-wechat**：微信小程序集成，目前只有 `WechatLoginService` 接口 + `WechatConfig` 配置，登录实现与用户表 CRUD 尚未落地。
+- **xtx-wechat**：微信小程序集成。已落地登录：`WxMaServiceConfig` 装配 WxJava `WxMaService`，`WechatLoginServiceImpl` 用它把 code 换成 openid。用户表完整 CRUD 接口仍未落地（`user` 表目前只有登录路径上的查/建）。
 - **xtx-core**：业务实体/dto/mapper/service/controller 的所在地，含 MyBatis-Plus / Redis / MinIO 配置。`@MapperScan` 在 `MyBatisPlusConfig` 里（`com.leejie.xtx.core.**.mapper`）。
 - **xtx-api**：依赖 spring-boot-starter-security，`SecurityConfig` 配置无状态 JWT 认证（见「当前未完成 / 易踩坑」的认证链路说明）。`@ComponentScan("com.leejie.xtx")` 全量扫描，保证 xtx-core/xtx-wechat 的 Bean 能被装配。
 - **xtx-admin**：最小启动模块，仅一个 HealthController。
@@ -92,7 +92,7 @@ xtx-code-generator (代码生成器，独立工具模块，不参与部署) ─>
 
 ## 当前未完成 / 易踩坑
 
-- **JWT 认证链路已接通，但真正的微信登录未落地**：`SecurityConfig`（xtx-api）默认所有接口要求认证，仅 `/auth/**`、`/health/**`、swagger 免认证；`JwtAuthFilter` 解析 Bearer token，把 userId（Long）放进 SecurityContext 的 principal，`SecurityUtils` / `SecurityCurrentUserProvider` 从那里取，与 OwnedService/FileService 的 `currentUser.currentUserId()` 一致。本地自测用 `GET /api/auth/dev-token?userId=1`（仅 dev profile）签 token。**尚未落地的是微信登录**：`WechatLoginService` 只有接口，没有 jscode2session → 建/查 user → 签 token 的实现，也没有 UserController / 登录注册接口。
+- **微信登录已落地**：`POST /api/auth/login`（入参 `{"code": ...}`，出参 `R<LoginVO>`，含 `token` + 精简 `userInfo{id,nickname,avatarUrl}`）已可用。链路：`AuthController` → `AuthServiceImpl`（openid 查/建 user；并发首登撞 `uk_openid` 时回读赢家行）→ `WechatLoginServiceImpl`（WxJava `WxMaService.getUserService().getSessionInfo`，微信 errcode 转 422）→ `UserMapper` → `JwtUtils`。`session_key` 暂不落库。认证链路其余部分不变：`SecurityConfig`（xtx-api）默认所有接口要求认证，仅 `/auth/**`、`/health/**`、swagger 免认证；`JwtAuthFilter` 解析 Bearer token，把 userId（Long）放进 SecurityContext 的 principal，`SecurityUtils` / `SecurityCurrentUserProvider` 从那里取，与 OwnedService/FileService 的 `currentUser.currentUserId()` 一致。`GET /api/auth/dev-token?userId=1`（仅 dev profile）保留为调试入口。
 - AI 生成（Spring AI + 通义千问）未实现。
 - 数据库密码等敏感配置直接写死在 `application.yml` 与 `Constants.TOKEN_SECRET`（注释标记 change-in-production）——属已知取舍，部署前需外置。
 
