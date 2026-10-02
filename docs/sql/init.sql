@@ -13,7 +13,7 @@ USE xtx;
 -- 1. 用户表
 -- ========================================
 CREATE TABLE IF NOT EXISTS `user` (
-    `id`          BIGINT       NOT NULL AUTO_INCREMENT  COMMENT '主键',
+    `id`          BIGINT       NOT NULL                 COMMENT '主键(雪花ID)',
     `openid`      VARCHAR(64)  NOT NULL                 COMMENT '微信openid',
     `nickname`    VARCHAR(64)  DEFAULT NULL             COMMENT '昵称',
     `avatar_url`  VARCHAR(512) DEFAULT NULL             COMMENT '头像URL',
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS `user` (
 -- 2. 记录表
 -- ========================================
 CREATE TABLE IF NOT EXISTS `record` (
-    `id`          BIGINT       NOT NULL AUTO_INCREMENT  COMMENT '主键',
+    `id`          BIGINT       NOT NULL                 COMMENT '主键(雪花ID)',
     `user_id`     BIGINT       NOT NULL                 COMMENT '用户ID',
     `category`    VARCHAR(16)  NOT NULL                 COMMENT '分类:LIFE/STUDY',
     `content`     TEXT         NOT NULL                 COMMENT '文字内容',
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS `record` (
 -- ========================================
 CREATE TABLE IF NOT EXISTS `report`
 (
-    `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `id`           BIGINT       NOT NULL                COMMENT '主键(雪花ID)',
     `user_id`      BIGINT       NOT NULL                COMMENT '用户ID',
     `template`     VARCHAR(32)  NOT NULL                COMMENT '模板:DIARY/WEEKLY/STUDY_SUMMARY/REVIEW',
     `title`        VARCHAR(128) DEFAULT NULL            COMMENT '报告标题',

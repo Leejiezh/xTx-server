@@ -25,8 +25,8 @@ import java.time.LocalDateTime;
 @Data
 public abstract class BaseEntity implements Serializable {
 
-    /** 主键，自增 */
-    @TableId(type = IdType.AUTO)
+    /** 主键，由 MyBatis-Plus 雪花算法生成（非自增，避免暴露业务量） */
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /** 创建时间，由 MySQL 默认值生成 */
