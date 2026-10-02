@@ -11,6 +11,4 @@ public class WechatConfig {
 
     private String appId;
     private String appSecret;
-    private String loginUrl = "https://api.weixin.qq.com/sns/jscode2session";
-    private String grantType = "authorization_code";
 }
