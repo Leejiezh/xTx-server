@@ -63,6 +63,8 @@ xtx-code-generator (代码生成器，独立工具模块，不参与部署) ─>
 
 `CurrentUserProvider` 接口是依赖方向的接缝：xtx-common 看不到 xtx-api 的登录态，所以定义该接口，由 xtx-api 的 `SecurityCurrentUserProvider`（读 Spring SecurityContextHolder）实现；测试则注入固定值假实现。
 
+**例外：通用字典（`dict_type` / `dict_item`）是系统级共享数据，不继承 `OwnedEntity`**——无 `user_id`、无 `deleted`，删除语义由 `enabled` 承担。读接口 `GET /api/dict/{typeCode}`（xtx-api 的 `DictController` → xtx-core 的 `DictService`）；`record.label` 存 `dict_item.item_key`（NULL=未分类）。详见 `.claude/rules/database.md` 6.2 与 `docs/superpowers/specs/2026-10-04-generic-dict-design.md`。
+
 ## 实体与 DTO 规范
 
 - `BaseEntity`：`id`（自增主键）、`createdAt`、`updatedAt`。**时间戳由 MySQL 默认值生成**（DDL 里 `DEFAULT CURRENT_TIMESTAMP` / `ON UPDATE`），项目里没有 MetaObjectHandler——因此 `save()` 之后实体对象里 `createdAt` 仍是 null，**新增接口只返回主键 id，不回填完整 VO**。

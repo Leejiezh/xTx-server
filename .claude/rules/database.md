@@ -54,3 +54,12 @@
 
 - **Why:** 维护约 3000+ 区县的国标码表（每年跟随更新）对一个个人记录类 app 是过度设计；且微信位置接口（`wx.getLocation` / `wx.chooseLocation`）受服务类目限制，日记记录类目无法申请，前端改用省市区三级选择器/手输。
 - **How to apply:** 前端用三级地区选择器生成文本，后端不校验格式；若未来出现按地区运营/统计诉求，再迁移为代码列。
+
+### 6.2 通用字典（dict_type / dict_item）是系统级共享数据，不继承 OwnedEntity
+
+通用字典服务全项目（首个消费者是笔记标签 `note_label`），不属于任何用户，因此两表**无 `user_id`、无 `deleted`**，不继承 `OwnedEntity` / `OwnedService`，也没有越权问题。
+
+- 删除语义由 `enabled` 开关承担（只禁用、不硬删），故不需要逻辑删除列。
+- `dict_item.dict_type` 存 `dict_type.type_code` 字符串（不是数字 id）：查某本字典的项不用 join；代价是 `type_code` 被引用后不可改名。
+- 类型专属属性（如标签颜色）存 `dict_item.extra`（JSON），不占通用列——避免"为一种类型污染通用表"。
+- 读接口 `GET /api/dict/{typeCode}` 只读；增 / 改 / 启停用 SQL 手动维护。
