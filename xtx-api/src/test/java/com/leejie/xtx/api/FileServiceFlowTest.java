@@ -7,6 +7,7 @@ import com.leejie.xtx.core.dto.PresignReq;
 import com.leejie.xtx.core.dto.PresignResp;
 import com.leejie.xtx.core.entity.FileMetadata;
 import com.leejie.xtx.core.mapper.FileMetadataMapper;
+import com.leejie.xtx.core.mapper.UserMapper;
 import com.leejie.xtx.core.service.impl.FileServiceImpl;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
@@ -101,7 +102,8 @@ class FileServiceFlowTest {
         });
 
         CurrentUserProvider currentUser = () -> USER_ID;
-        fileService = new FileServiceImpl(minioClient, minioConfig, mapper, fileProperties, currentUser);
+        UserMapper userMapper = mock(UserMapper.class);
+        fileService = new FileServiceImpl(minioClient, minioConfig, mapper, fileProperties, currentUser, userMapper);
     }
 
     @Test

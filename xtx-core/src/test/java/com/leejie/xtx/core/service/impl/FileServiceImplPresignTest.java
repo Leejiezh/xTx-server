@@ -8,6 +8,7 @@ import com.leejie.xtx.core.dto.PresignReq;
 import com.leejie.xtx.core.dto.PresignResp;
 import com.leejie.xtx.core.entity.FileMetadata;
 import com.leejie.xtx.core.mapper.FileMetadataMapper;
+import com.leejie.xtx.core.mapper.UserMapper;
 import io.minio.MinioClient;
 import io.minio.PostPolicy;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,8 @@ class FileServiceImplPresignTest {
     private FileMetadataMapper fileMetadataMapper;
     @Mock
     private CurrentUserProvider currentUser;
+    @Mock
+    private UserMapper userMapper;
 
     /** 用真实对象而非 mock：校验逻辑依赖它的默认上限值 */
     private final FileProperties fileProperties = new FileProperties();
@@ -50,7 +53,7 @@ class FileServiceImplPresignTest {
     @BeforeEach
     void setUp() {
         // 手动构造而非 @InjectMocks：fileProperties 不是 mock，@InjectMocks 会给它塞 null
-        fileService = new FileServiceImpl(minioClient, minioConfig, fileMetadataMapper, fileProperties, currentUser);
+        fileService = new FileServiceImpl(minioClient, minioConfig, fileMetadataMapper, fileProperties, currentUser, userMapper);
     }
 
     private PresignReq req(String contentType, Long size, String filename) {

@@ -7,6 +7,7 @@ import com.leejie.xtx.core.config.MinioConfig;
 import com.leejie.xtx.core.dto.UploadResp;
 import com.leejie.xtx.core.entity.FileMetadata;
 import com.leejie.xtx.core.mapper.FileMetadataMapper;
+import com.leejie.xtx.core.mapper.UserMapper;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,8 @@ class FileServiceImplUploadTest {
     private FileMetadataMapper fileMetadataMapper;
     @Mock
     private CurrentUserProvider currentUser;
+    @Mock
+    private UserMapper userMapper;
 
     private final FileProperties fileProperties = new FileProperties();
 
@@ -48,7 +51,7 @@ class FileServiceImplUploadTest {
 
     @BeforeEach
     void setUp() {
-        fileService = new FileServiceImpl(minioClient, minioConfig, fileMetadataMapper, fileProperties, currentUser);
+        fileService = new FileServiceImpl(minioClient, minioConfig, fileMetadataMapper, fileProperties, currentUser, userMapper);
     }
 
     @Test

@@ -62,6 +62,16 @@ public interface FileService {
     void delete(String objectKey);
 
     /**
+     * 确认文件属于当前用户（不读写对象本身）。
+     *
+     * <p>头像等非记录类归属校验入口：写库前先确认 objectKey 归当前用户所有，
+     * 与 {@link #attach} 的严格度一致。
+     *
+     * @throws com.leejie.xtx.common.exception.BusinessException 404，不存在或不属于当前用户
+     */
+    void requireOwned(String objectKey);
+
+    /**
      * 把文件附加到记录：标 ATTACHED，从此不再被孤儿清理任务回收。
      *
      * @throws com.leejie.xtx.common.exception.BusinessException 422，key 无效、尚未上传、

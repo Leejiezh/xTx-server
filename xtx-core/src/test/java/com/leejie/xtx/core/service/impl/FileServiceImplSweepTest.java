@@ -4,7 +4,9 @@ import com.leejie.xtx.common.base.security.CurrentUserProvider;
 import com.leejie.xtx.core.config.FileProperties;
 import com.leejie.xtx.core.config.MinioConfig;
 import com.leejie.xtx.core.entity.FileMetadata;
+import com.leejie.xtx.core.entity.User;
 import com.leejie.xtx.core.mapper.FileMetadataMapper;
+import com.leejie.xtx.core.mapper.UserMapper;
 import io.minio.MinioClient;
 import io.minio.RemoveObjectArgs;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +36,8 @@ class FileServiceImplSweepTest {
     private FileMetadataMapper fileMetadataMapper;
     @Mock
     private CurrentUserProvider currentUser;
+    @Mock
+    private UserMapper userMapper;
 
     private final FileProperties fileProperties = new FileProperties();
 
@@ -41,7 +45,7 @@ class FileServiceImplSweepTest {
 
     @BeforeEach
     void setUp() {
-        fileService = new FileServiceImpl(minioClient, minioConfig, fileMetadataMapper, fileProperties, currentUser);
+        fileService = new FileServiceImpl(minioClient, minioConfig, fileMetadataMapper, fileProperties, currentUser, userMapper);
     }
 
     private FileMetadata orphan(String key, String status) {
@@ -58,6 +62,7 @@ class FileServiceImplSweepTest {
         when(minioConfig.getBucket()).thenReturn("xtx");
         when(fileMetadataMapper.selectList(any()))
                 .thenReturn(List.of(orphan("img/1/a.jpg", "TEMP"), orphan("file/1/b.pdf", "DETACHED")));
+        when(userMapper.selectList(any())).thenReturn(List.of());
 
         assertEquals(2, fileService.sweepOrphans());
 
@@ -82,6 +87,7 @@ class FileServiceImplSweepTest {
         when(minioConfig.getBucket()).thenReturn("xtx");
         when(fileMetadataMapper.selectList(any()))
                 .thenReturn(List.of(orphan("bad", "TEMP"), orphan("good", "TEMP")));
+        when(userMapper.selectList(any())).thenReturn(List.of());
         doThrow(new RuntimeException("minio down"))
                 .when(minioClient).removeObject(argsWithObject("bad"));
 
@@ -105,5 +111,22 @@ class FileServiceImplSweepTest {
         fileService.sweepOrphans();
 
         verify(currentUser, never()).currentUserId();
+    }
+
+    @Test
+    @DisplayName("被 user.avatar_url 引用的 TEMP 文件视为有效头像，不被清理")
+    void sweepOrphans_skipsAvatarReferencedKeys() throws Exception {
+        when(minioConfig.getBucket()).thenReturn("xtx");
+        when(fileMetadataMapper.selectList(any()))
+                .thenReturn(List.of(orphan("img/1/avatar.jpg", "TEMP"), orphan("img/1/orphan.jpg", "TEMP")));
+        User u = new User();
+        u.setAvatarUrl("img/1/avatar.jpg");
+        when(userMapper.selectList(any())).thenReturn(List.of(u));
+
+        assertEquals(1, fileService.sweepOrphans());
+
+        verify(minioClient).removeObject(argsWithObject("img/1/orphan.jpg"));
+        verify(fileMetadataMapper, never()).deleteById("img/1/avatar.jpg");
+        verify(fileMetadataMapper).deleteById("img/1/orphan.jpg");
     }
 }

@@ -6,6 +6,7 @@ import com.leejie.xtx.core.config.FileProperties;
 import com.leejie.xtx.core.config.MinioConfig;
 import com.leejie.xtx.core.entity.FileMetadata;
 import com.leejie.xtx.core.mapper.FileMetadataMapper;
+import com.leejie.xtx.core.mapper.UserMapper;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.RemoveObjectArgs;
@@ -43,6 +44,8 @@ class FileServiceImplAccessTest {
     private FileMetadataMapper fileMetadataMapper;
     @Mock
     private CurrentUserProvider currentUser;
+    @Mock
+    private UserMapper userMapper;
 
     private final FileProperties fileProperties = new FileProperties();
 
@@ -50,7 +53,7 @@ class FileServiceImplAccessTest {
 
     @BeforeEach
     void setUp() {
-        fileService = new FileServiceImpl(minioClient, minioConfig, fileMetadataMapper, fileProperties, currentUser);
+        fileService = new FileServiceImpl(minioClient, minioConfig, fileMetadataMapper, fileProperties, currentUser, userMapper);
     }
 
     /** 属于 OWNER 的元数据 */

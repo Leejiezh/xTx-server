@@ -68,3 +68,11 @@
 - `dict_item.dict_type` 存 `dict_type.type_code` 字符串（不是数字 id）：查某本字典的项不用 join；代价是 `type_code` 被引用后不可改名。
 - 类型专属属性（如标签颜色）存 `dict_item.extra`（JSON），不占通用列——避免"为一种类型污染通用表"。
 - 读接口 `GET /api/dict/{typeCode}` 只读；增 / 改 / 启停用 SQL 手动维护。
+
+### 6.3 `user.avatar_url` 存 objectKey，sweeper 豁免被它引用的文件
+
+`user.avatar_url` 列语义是「头像 URL」，但实际**存 objectKey**（如 `img/42/2026/10/04/uuid.jpg`），读时由 `UserController` 现签 access URL 出站——与 `record.images` 同一取舍（ADR-0002：不在 DB 存会过期的 URL）。
+
+- **sweeper 豁免**：头像文件不进任何 record，永远是 `file_metadata.TEMP`；`OrphanFileSweeper` 清理前会排除「被 `user.avatar_url` 引用的 objectKey」，否则头像会在 24h 宽限期后被当孤儿删掉。实现见 `FileServiceImpl.referencedAvatarKeys`。
+- **换头像**：`PUT /user/profile` 把新 key 落 `avatar_url`，旧 key 调 `detachAll` 标 DETACHED 进入宽限期；不再被引用的旧头像会被 sweeper 清理，新头像因被引用而豁免。
+- **清空头像**：`User.avatarUrl` 实体带 `@TableField(updateStrategy = FieldStrategy.ALWAYS)`——默认 NOT_NULL 策略会跳过 `avatar_url=null`，导致旧头像永远删不掉（与 `Record.label` 同一取舍）。

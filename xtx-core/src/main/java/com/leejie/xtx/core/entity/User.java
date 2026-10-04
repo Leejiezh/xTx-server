@@ -1,5 +1,7 @@
 package com.leejie.xtx.core.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.leejie.xtx.common.base.entity.BaseEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,7 +23,13 @@ public class User extends BaseEntity {
     @Schema(description = "昵称")
     private String nickname;
 
-    /** 头像URL */
+    /**
+     * 头像objectKey。
+     *
+     * <p>updateStrategy = ALWAYS：清空头像（置 null）也是合法操作，默认的
+     * NOT_NULL 策略会跳过 null 列，导致旧头像永远删不掉 —— 与 Record.label 同一取舍。
+     */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     @Schema(description = "头像URL")
     private String avatarUrl;
 

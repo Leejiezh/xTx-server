@@ -10,7 +10,9 @@ import com.leejie.xtx.core.dto.PresignReq;
 import com.leejie.xtx.core.dto.PresignResp;
 import com.leejie.xtx.core.dto.UploadResp;
 import com.leejie.xtx.core.entity.FileMetadata;
+import com.leejie.xtx.core.entity.User;
 import com.leejie.xtx.core.mapper.FileMetadataMapper;
+import com.leejie.xtx.core.mapper.UserMapper;
 import com.leejie.xtx.core.service.FileService;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
@@ -67,6 +69,7 @@ public class FileServiceImpl implements FileService {
     private final FileMetadataMapper fileMetadataMapper;
     private final FileProperties fileProperties;
     private final CurrentUserProvider currentUser;
+    private final UserMapper userMapper;
 
     @Override
     public PresignResp presign(PresignReq req) {
@@ -126,7 +129,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public String accessUrl(String objectKey, boolean download) {
-        FileMetadata meta = requireOwned(objectKey);
+        FileMetadata meta = getOwnedFile(objectKey);
         return presignedGetUrl(objectKey, meta, download);
     }
 
@@ -154,10 +157,15 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public void delete(String objectKey) {
-        requireOwned(objectKey);
+        getOwnedFile(objectKey);
         // 先删对象、失败就抛：元数据行留着，用户可重试。反序则行没了而对象永久失联
         removeObject(objectKey);
         fileMetadataMapper.deleteById(objectKey);
+    }
+
+    @Override
+    public void requireOwned(String objectKey) {
+        getOwnedFile(objectKey);
     }
 
     @Override
@@ -213,8 +221,14 @@ public class FileServiceImpl implements FileService {
                 .lt("created_at", cutoff);
 
         List<FileMetadata> orphans = fileMetadataMapper.selectList(wrapper);
+        // 用户头像停在被 user.avatar_url 引用、不进任何记录 → 永远是 TEMP。
+        // 先排除被引用的 key，否则头像会被当孤儿在宽限期后删掉（见头像持久化设计）。
+        Set<String> avatarKeys = referencedAvatarKeys(orphans);
         int deleted = 0;
         for (FileMetadata meta : orphans) {
+            if (avatarKeys.contains(meta.getObjectKey())) {
+                continue;
+            }
             // 对象删不掉就留着这一行，下一轮重扫时重试 —— 先删行会让残留对象永久失联
             if (!tryRemoveObject(meta.getObjectKey())) {
                 continue;
@@ -223,6 +237,21 @@ public class FileServiceImpl implements FileService {
             deleted++;
         }
         return deleted;
+    }
+
+    /** 收集被 user.avatar_url 引用的 objectKey：这些是有效头像，不是孤儿 */
+    private Set<String> referencedAvatarKeys(List<FileMetadata> orphans) {
+        if (CollectionUtils.isEmpty(orphans)) {
+            return Set.of();
+        }
+        List<String> keys = orphans.stream().map(FileMetadata::getObjectKey).toList();
+        return userMapper.selectList(new QueryWrapper<User>()
+                        .select("avatar_url")
+                        .isNotNull("avatar_url")
+                        .in("avatar_url", keys))
+                .stream()
+                .map(User::getAvatarUrl)
+                .collect(Collectors.toSet());
     }
 
     // ---------------- 内部辅助 ----------------
@@ -298,7 +327,7 @@ public class FileServiceImpl implements FileService {
     }
 
     /** 不属于当前用户的 key 一律按「不存在」返回 404，与 {@code OwnedServiceImpl} 同一取舍 */
-    private FileMetadata requireOwned(String objectKey) {
+    private FileMetadata getOwnedFile(String objectKey) {
         FileMetadata meta = fileMetadataMapper.selectById(objectKey);
         if (meta == null || !meta.getUserId().equals(currentUser.currentUserId())) {
             throw new BusinessException(404, "文件不存在");
