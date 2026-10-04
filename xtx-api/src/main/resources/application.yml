@@ -11,7 +11,7 @@ spring:
     active: dev
   datasource:
     url: jdbc:mysql://localhost:3306/xtx?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: leejie
+    username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
@@ -32,8 +32,8 @@ mybatis-plus:
 
 minio:
   endpoint: http://localhost:9000
-  access-key: xtx-minio
-  secret-key: admin123
+  access-key: leejie
+  secret-key: leejie123
   bucket: xtx
 
 file:

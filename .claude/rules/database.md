@@ -38,6 +38,11 @@
 
 > 一旦有生产数据，此条需重新评估，改为独立 migration 脚本。
 
+**重建本地库用 utf8mb4 连接**：容器内 mysql 客户端默认连接字符集是 **latin1**，直接 `mysql < init.sql` 会把 UTF-8 的中文按 latin1 存成双重编码乱码（表结构是 utf8mb4 也救不回）。
+- 本机容器已修复默认：`/etc/my.cnf` 的 `[client]` 加了 `default-character-set=utf8mb4`（即时生效）；bind 挂载的 `/etc/mysql/conf.d/zz-charset.cnf` 加了 `[mysqld] skip-character-set-client-handshake`（容器重建后仍生效）。因此现在直接 `mysql < init.sql` 即可，不再需要显式标志。
+- 若容器重建后这两处丢失，重加 `[mysqld] skip-character-set-client-handshake` 到 `/etc/mysql/conf.d/`（参考仓库 `docker/mysql/charset.cnf`）。
+- 兜底命令仍有效：`wsl docker exec -i lee-mysql mysql --default-character-set=utf8mb4 -uroot -p123456 < /mnt/d/.../init.sql`。
+
 **为什么 DDL 是权威而非附属文档**：项目没有 `MetaObjectHandler`，`created_at` / `updated_at` 的写入完全依赖 DDL 里的 `DEFAULT CURRENT_TIMESTAMP` / `ON UPDATE CURRENT_TIMESTAMP`；`deleted` 的 `NOT NULL DEFAULT 0` 决定 `@TableLogic` 能否正常工作。改这些列的 DDL 会直接改变实体的运行时行为，而实体类里看不出任何线索。
 
 ## 5. 新增业务表的前提
