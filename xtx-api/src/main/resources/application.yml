@@ -31,7 +31,9 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 minio:
-  endpoint: http://localhost:9000
+  # 用 127.0.0.1 不用 localhost：Windows 优先把 localhost 解析成 ::1，
+  # 而 WSL NAT 中继的 IPv6 转发是坏的（IPv4 正常），走 ::1 会挂起/空响应
+  endpoint: http://127.0.0.1:9000
   access-key: leejie
   secret-key: leejie123
   bucket: xtx
