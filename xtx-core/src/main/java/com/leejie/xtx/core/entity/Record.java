@@ -1,5 +1,6 @@
 package com.leejie.xtx.core.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.leejie.xtx.common.base.entity.OwnedEntity;
@@ -23,9 +24,15 @@ public class Record extends OwnedEntity {
     @Schema(description = "用户ID")
     private Long userId;
 
-    /** 分类:LIFE/STUDY */
-    @Schema(description = "分类:LIFE/STUDY")
-    private String category;
+    /**
+     * 标签:dict_item.item_key(空=未分类)。
+     *
+     * <p>ALWAYS 策略是必需的：NULL 表示"未分类"，而默认 NOT_NULL 更新策略会跳过 null，
+     * 导致改回未分类时旧标签删不掉。images 不能用这个策略（null=未提交，见 RecordServiceImpl）。
+     */
+    @Schema(description = "标签:dict_item.item_key(空=未分类)")
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private String label;
 
     /** 文字内容 */
     @Schema(description = "文字内容")

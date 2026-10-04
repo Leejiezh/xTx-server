@@ -17,9 +17,8 @@ public class RecordUpdateReq {
     @Schema(description = "主键ID")
     private Long id;
 
-    @Schema(description = "分类:LIFE/STUDY")
-    @NotNull(message = "分类:LIFE/STUDY不能为空")
-    private String category;
+    @Schema(description = "标签:dict_item.item_key(空=未分类)")
+    private String label;
     @Schema(description = "文字内容")
     @NotNull(message = "文字内容不能为空")
     private String content;

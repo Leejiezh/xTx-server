@@ -14,8 +14,8 @@ public class RecordVO {
 
     @Schema(description = "主键")
     private Long id;
-    @Schema(description = "分类:LIFE/STUDY")
-    private String category;
+    @Schema(description = "标签:dict_item.item_key(空=未分类)")
+    private String label;
     @Schema(description = "文字内容")
     private String content;
     /** fromEntity 出来时装的是 objectKey，由 Controller 换成 access URL 后才出站 */

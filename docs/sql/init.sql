@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS `user` (
 CREATE TABLE IF NOT EXISTS `record` (
     `id`          BIGINT       NOT NULL                 COMMENT '主键(雪花ID)',
     `user_id`     BIGINT       NOT NULL                 COMMENT '用户ID',
-    `category`    VARCHAR(16)  NOT NULL                 COMMENT '分类:LIFE/STUDY',
+    `label`       VARCHAR(64)  DEFAULT NULL             COMMENT '标签:dict_item.item_key(空=未分类)',
     `content`     TEXT         NOT NULL                 COMMENT '文字内容',
     `images`      JSON         DEFAULT NULL             COMMENT '图片objectKey数组(非URL,读时签发access URL)',
     `record_date` DATE         NOT NULL                 COMMENT '记录日期(支持补记)',
