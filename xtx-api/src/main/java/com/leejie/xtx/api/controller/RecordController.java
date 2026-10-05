@@ -1,9 +1,10 @@
 package com.leejie.xtx.api.controller;
 
-import com.leejie.xtx.common.base.query.PageQuery;
+import cn.hutool.core.util.StrUtil;
 import com.leejie.xtx.common.base.vo.PageResult;
 import com.leejie.xtx.common.result.R;
 import com.leejie.xtx.core.dto.RecordCreateReq;
+import com.leejie.xtx.core.dto.RecordQuery;
 import com.leejie.xtx.core.dto.RecordUpdateReq;
 import com.leejie.xtx.core.dto.RecordVO;
 import com.leejie.xtx.core.entity.Record;
@@ -30,19 +31,29 @@ public class RecordController {
     private final RecordService recordService;
     private final FileService fileService;
 
-    @PostMapping
+
+    @GetMapping("/page")
+    @Operation(summary = "分页查询记录表")
+    public R<PageResult<RecordVO>> page(@Valid RecordQuery query) {
+        // 无筛选必须传 null：空 lambda 会被 applyFilters 嵌套成 AND ()，SQL 直接报错
+        String label = query.getLabel();
+        return R.ok(PageResult.of(recordService.page(query,
+                StrUtil.isBlank(label) ? null : q -> q.eq("label", label)), this::toVO));
+    }
+
+    @PostMapping("/create")
     @Operation(summary = "创建记录表")
     public R<Long> create(@Valid @RequestBody RecordCreateReq req) {
         return R.ok(recordService.create(req.toEntity()));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/getDetail/{id}")
     @Operation(summary = "查询记录表详情")
     public R<RecordVO> get(@PathVariable Long id) {
         return R.ok(toVO(recordService.get(id)));
     }
 
-    @PutMapping
+    @PutMapping("/update")
     @Operation(summary = "更新记录表")
     public R<Void> update(@Valid @RequestBody RecordUpdateReq req) {
         recordService.update(req.toEntity());
@@ -56,11 +67,6 @@ public class RecordController {
         return R.ok();
     }
 
-    @GetMapping("/page")
-    @Operation(summary = "分页查询记录表")
-    public R<PageResult<RecordVO>> page(PageQuery query) {
-        return R.ok(PageResult.of(recordService.page(query, null), this::toVO));
-    }
 
     private RecordVO toVO(Record entity) {
         RecordVO vo = RecordVO.fromEntity(entity);

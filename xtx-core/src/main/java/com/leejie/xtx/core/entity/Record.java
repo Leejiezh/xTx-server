@@ -25,6 +25,15 @@ public class Record extends OwnedEntity {
     private Long userId;
 
     /**
+     * 标题（可空：只有正文的笔记没有标题）。
+     *
+     * <p>用默认 NOT_NULL 更新策略：编辑器总是提交字符串（空串即"无标题"），
+     * 不依赖 null 来清空，因此不需要像 label 那样用 ALWAYS。
+     */
+    @Schema(description = "标题(空=无标题)")
+    private String title;
+
+    /**
      * 标签:dict_item.item_key(空=未分类)。
      *
      * <p>ALWAYS 策略是必需的：NULL 表示"未分类"，而默认 NOT_NULL 更新策略会跳过 null，
@@ -34,7 +43,7 @@ public class Record extends OwnedEntity {
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String label;
 
-    /** 文字内容 */
+    /** 文字内容（可空串：标题即笔记时正文为空） */
     @Schema(description = "文字内容")
     private String content;
 
@@ -46,10 +55,6 @@ public class Record extends OwnedEntity {
     /** 记录日期(支持补记) */
     @Schema(description = "记录日期(支持补记)")
     private LocalDate recordDate;
-
-    /** 来源:MANUAL/IMAGE */
-    @Schema(description = "来源:MANUAL/IMAGE")
-    private String source;
 
     /** 创建时间 */
     @Schema(description = "创建时间")

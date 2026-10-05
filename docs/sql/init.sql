@@ -34,11 +34,11 @@ CREATE TABLE IF NOT EXISTS `user` (
 CREATE TABLE IF NOT EXISTS `record` (
     `id`          BIGINT       NOT NULL                 COMMENT '主键(雪花ID)',
     `user_id`     BIGINT       NOT NULL                 COMMENT '用户ID',
+    `title`       VARCHAR(128) DEFAULT NULL             COMMENT '标题(空=无标题)',
     `label`       VARCHAR(64)  DEFAULT NULL             COMMENT '标签:dict_item.item_key(空=未分类)',
-    `content`     TEXT         NOT NULL                 COMMENT '文字内容',
+    `content`     TEXT         NOT NULL                 COMMENT '文字内容(可为空串，标题即笔记时正文为空)',
     `images`      JSON         DEFAULT NULL             COMMENT '图片objectKey数组(非URL,读时签发access URL)',
     `record_date` DATE         NOT NULL                 COMMENT '记录日期(支持补记)',
-    `source`      VARCHAR(16)  NOT NULL DEFAULT 'MANUAL' COMMENT '来源:MANUAL/IMAGE',
     `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted`     TINYINT      NOT NULL DEFAULT 0       COMMENT '逻辑删除标记(0-正常,1-删除)',
@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS `record` (
     KEY `idx_user_record_date` (`user_id`, `record_date`, `deleted`),
     KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='记录表';
+
+-- 已存在的库：本脚本 CREATE TABLE IF NOT EXISTS 不会改已有表结构，需单独执行下面这行
+-- ALTER TABLE `record` ADD COLUMN `title` VARCHAR(128) DEFAULT NULL COMMENT '标题(空=无标题)' AFTER `user_id`;
 
 
 -- ========================================

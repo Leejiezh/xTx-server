@@ -61,7 +61,9 @@ public interface OwnedService<T extends OwnedEntity> {
      * 分页查当前用户的数据，默认按 id 倒序 —— 小程序两个列表 tab 都是时间倒序上拉加载。
      *
      * @param filters 业务筛选条件，可为 null。会被嵌套进括号内与 user_id 做 AND，
-     *                因此里面用 {@code .or()} 也逃不出当前用户范围
+     *                因此里面用 {@code .or()} 也逃不出当前用户范围。
+     *                无筛选时必须传 null，不能传空 lambda —— 空条件照样会嵌套成
+     *                {@code AND ()}，生成非法 SQL
      */
     IPage<T> page(PageQuery query, Consumer<QueryWrapper<T>> filters);
 

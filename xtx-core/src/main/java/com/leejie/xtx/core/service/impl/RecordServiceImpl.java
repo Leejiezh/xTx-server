@@ -1,6 +1,7 @@
 package com.leejie.xtx.core.service.impl;
 
 import com.leejie.xtx.common.base.service.impl.OwnedServiceImpl;
+import com.leejie.xtx.common.exception.BusinessException;
 import com.leejie.xtx.core.entity.Record;
 import com.leejie.xtx.core.mapper.RecordMapper;
 import com.leejie.xtx.core.service.FileService;
@@ -30,6 +31,7 @@ public class RecordServiceImpl extends OwnedServiceImpl<RecordMapper, Record> im
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long create(Record entity) {
+        normalizeContent(entity);
         Long id = super.create(entity);
         fileService.attach(id, entity.getImages());
         return id;
@@ -43,6 +45,7 @@ public class RecordServiceImpl extends OwnedServiceImpl<RecordMapper, Record> im
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void update(Record entity) {
+        normalizeContent(entity);
         // 先取旧 images：super.update 之后实体里已是新值，无从对比
         List<String> oldKeys = super.get(entity.getId()).getImages();
         List<String> newKeys = entity.getImages();
@@ -50,6 +53,23 @@ public class RecordServiceImpl extends OwnedServiceImpl<RecordMapper, Record> im
         if (newKeys != null) {
             fileService.reconcile(entity.getId(), newKeys, oldKeys);
         }
+    }
+
+    /**
+     * 标题与正文至少一项非空；content 空串时兜底为 ""（content 列 NOT NULL，
+     * 前端空正文会发空串而非缺省，这里再兜一道防止缺字段直接踩 DB 约束）。
+     */
+    private void normalizeContent(Record entity) {
+        if (isBlank(entity.getTitle()) && isBlank(entity.getContent())) {
+            throw new BusinessException(422, "标题与内容不能同时为空");
+        }
+        if (entity.getContent() == null) {
+            entity.setContent("");
+        }
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     @Override

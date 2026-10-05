@@ -17,20 +17,17 @@ public class RecordUpdateReq {
     @Schema(description = "主键ID")
     private Long id;
 
+    @Schema(description = "标题(空=无标题)")
+    private String title;
     @Schema(description = "标签:dict_item.item_key(空=未分类)")
     private String label;
-    @Schema(description = "文字内容")
-    @NotNull(message = "文字内容不能为空")
+    @Schema(description = "文字内容(与标题至少一项非空，service 层校验)")
     private String content;
     @Schema(description = "图片objectKey数组")
     private List<String> images;
     @Schema(description = "记录日期(支持补记)")
     @NotNull(message = "记录日期(支持补记)不能为空")
     private LocalDate recordDate;
-    @Schema(description = "来源:MANUAL/IMAGE")
-    @NotNull(message = "来源:MANUAL/IMAGE不能为空")
-    private String source;
-
     public Record toEntity() {
         Record entity = new Record();
         BeanUtils.copyProperties(this, entity);
