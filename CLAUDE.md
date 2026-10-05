@@ -113,3 +113,16 @@ xtx-code-generator (代码生成器，独立工具模块，不参与部署) ─>
 - 仅在用户明确要求"编译"、"测试"、"验证"、"运行"、"启动"、"打包"或指定具体命令时，才执行对应命令。
 - 如果流程技能或计划中包含最终编译 / final verification / smoke test 等步骤，默认跳过，并在汇报中说明"按项目规则未执行验证命令"。
 - 可以在最终汇报中给出建议用户自行执行的命令，但不要主动运行。
+
+## 编码规则
+
+具体规则见 `.claude/rules/`，按主题拆分：
+
+- `code-style.md`：命名、方法拆分、注释、简洁
+- `constants-and-utils.md`：Hutool、常量与枚举
+- `layering.md`：分层、对象划分、统一返回、异常、参数校验
+- `mybatis.md`：数据库与 MyBatis-Plus
+- `redis.md`：缓存与分布式锁
+- `dubbo.md`：服务接口与调用
+- `security-and-logging.md`：日志与安全
+- `testing-and-git.md`：测试与提交
