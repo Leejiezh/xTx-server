@@ -3,8 +3,10 @@ package com.leejie.xtx.common.exception;
 import com.leejie.xtx.common.result.R;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -20,6 +22,18 @@ public class GlobalExceptionHandler {
     public R<Void> handleIllegalArgument(IllegalArgumentException e) {
         log.warn("参数异常: {}", e.getMessage());
         return R.fail(HttpStatus.BAD_REQUEST.value(), e.getMessage());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public R<Void> handleNoResource(NoResourceFoundException e) {
+        log.warn("接口不存在: {}", e.getResourcePath());
+        return R.fail(HttpStatus.NOT_FOUND.value(), "接口不存在: " + e.getResourcePath());
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public R<Void> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        log.warn("请求方式不支持: {}", e.getMessage());
+        return R.fail(HttpStatus.METHOD_NOT_ALLOWED.value(), e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
