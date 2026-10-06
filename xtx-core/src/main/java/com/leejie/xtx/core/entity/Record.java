@@ -64,4 +64,11 @@ public class Record extends OwnedEntity {
     @Schema(description = "更新时间")
     private LocalDateTime updatedAt;
 
+    /**
+     * 进回收站时间(NULL=正常)。删除笔记时置值，普通查询一律排除；
+     * 彻底删除时随 @TableLogic 的 deleted=1 一起隐藏，此后不可恢复。
+     */
+    @Schema(description = "进回收站时间(NULL=正常)")
+    private LocalDateTime recycledAt;
+
 }

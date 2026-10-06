@@ -1,5 +1,9 @@
 package com.leejie.xtx.core.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.leejie.xtx.common.base.query.PageQuery;
 import com.leejie.xtx.common.base.service.impl.OwnedServiceImpl;
 import com.leejie.xtx.common.exception.BusinessException;
 import com.leejie.xtx.core.entity.Record;
@@ -10,17 +14,22 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * 记录表 服务实现
  *
- * <p>override create/update/delete 是为了钩住 file_metadata 的附件生命周期：
- * create → attach（TEMP 转 ATTACHED）；update → reconcile（新增的 ATTACHED、被移除的 DETACHED）；
- * delete → detachAll（进入 24h 宽限期，由 OrphanFileSweeper 物理清理）。
+ * <p>create → attach（TEMP 转 ATTACHED）；update → reconcile（新增的 ATTACHED、被移除的 DETACHED）；
+ * delete → 移入回收站（置 recycled_at，不删行、不动图片，可完整恢复）；
+ * purge → 彻底删除（仅回收站内记录，@TableLogic 置 deleted=1 + detachAll 让图片进 24h 宽限期）。
  *
- * <p>三个方法都在同一事务内：附件校验失败（如 objectKey 不属于当前用户）必须连带回滚
- * 记录本身，否则会留下一条引用了无效图片的记录。
+ * <p>普通查询（page/get/update）一律排除回收站记录；回收站的列表/恢复接口（RecycleController）
+ * 后续复用 {@link #recycledById} 同源的 recycled_at 条件。
+ *
+ * <p>会改附件的方法都在同一事务内：附件校验失败必须连带回滚记录本身，
+ * 否则会留下一条引用了无效图片的记录。
  */
 @Service
 @RequiredArgsConstructor
@@ -46,8 +55,9 @@ public class RecordServiceImpl extends OwnedServiceImpl<RecordMapper, Record> im
     @Transactional(rollbackFor = Exception.class)
     public void update(Record entity) {
         normalizeContent(entity);
-        // 先取旧 images：super.update 之后实体里已是新值，无从对比
-        List<String> oldKeys = super.get(entity.getId()).getImages();
+        // 先取旧 images：super.update 之后实体里已是新值，无从对比。
+        // 用本类 get() 而非 super.get()：回收站记录不可编辑（404）。
+        List<String> oldKeys = get(entity.getId()).getImages();
         List<String> newKeys = entity.getImages();
         super.update(entity);
         if (newKeys != null) {
@@ -72,11 +82,89 @@ public class RecordServiceImpl extends OwnedServiceImpl<RecordMapper, Record> im
         return s == null || s.isBlank();
     }
 
+    /**
+     * 移入回收站：只置 recycled_at，不删行、不 detach 图片 —— 回收站内图片保留，
+     * 恢复后能完整还原。彻底删除见 {@link #purge}。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        List<String> oldKeys = super.get(id).getImages();
-        super.delete(id);
-        fileService.detachAll(oldKeys);
+        // 归属 + 存在 + 未回收；已回收的记录再删 → 404（应走 purge）
+        get(id);
+        LambdaUpdateWrapper<Record> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(Record::getId, id)
+                .eq(Record::getUserId, currentUser.currentUserId())
+                .set(Record::getRecycledAt, LocalDateTime.now());
+        super.update(null, wrapper);
+    }
+
+    @Override
+    public Record get(Long id) {
+        Record record = super.get(id);
+        if (record.getRecycledAt() != null) {
+            throw new BusinessException(404, "数据不存在");
+        }
+        return record;
+    }
+
+    /** 普通分页恒排除回收站记录（回收站列表走 {@link #recycledById} 同源条件） */
+    @Override
+    public IPage<Record> page(PageQuery query, Consumer<QueryWrapper<Record>> filters) {
+        Consumer<QueryWrapper<Record>> scoped = filters == null
+                ? w -> w.isNull("recycled_at")
+                : filters.andThen(w -> w.isNull("recycled_at"));
+        return super.page(query, scoped);
+    }
+
+    /**
+     * 彻底删除：仅回收站内记录。@TableLogic 把 remove 变成 UPDATE ... SET deleted=1，
+     * 行留库但从所有查询消失（普通查询与回收站查询都带 deleted=0，不可再恢复）；
+     * 图片 detach 后进入 24h 宽限期由 OrphanFileSweeper 物理清理。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void purge(Long id) {
+        Record record = super.getOne(recycledById(id));
+        if (record == null) {
+            throw new BusinessException(404, "数据不存在");
+        }
+        super.remove(recycledById(id));
+        fileService.detachAll(record.getImages());
+    }
+
+    /** 回收站分页：仅回收站内记录，按进回收站时间倒序（最新删除在前） */
+    @Override
+    public IPage<Record> recyclePage(PageQuery query) {
+        return super.page(query.toPage(), new QueryWrapper<Record>()
+                .eq("user_id", currentUser.currentUserId())
+                .isNotNull("recycled_at")
+                .orderByDesc("recycled_at"));
+    }
+
+    /**
+     * 从回收站恢复：置 recycled_at=null，图片随记录一并还原（回收时未 detach）。
+     * 仅回收站内记录可恢复（否则 404），已彻底删除的记录不可恢复。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void restore(Long id) {
+        if (!super.exists(recycledById(id))) {
+            throw new BusinessException(404, "数据不存在");
+        }
+        // 用 setSql 置 NULL：lambda 的 set(column, null) 对 null 值在不同版本行为不一，
+        // 显式 SQL 保证生成 SET recycled_at = NULL
+        LambdaUpdateWrapper<Record> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(Record::getId, id)
+                .eq(Record::getUserId, currentUser.currentUserId())
+                .setSql("recycled_at = NULL");
+        super.update(null, wrapper);
+    }
+
+    /** 回收站内的记录：归属 + 存在 + 已进回收站（recycled_at 非空）；@TableLogic 自动附加 deleted=0 */
+    private QueryWrapper<Record> recycledById(Long id) {
+        return new QueryWrapper<Record>()
+                .eq("user_id", currentUser.currentUserId())
+                .eq("id", id)
+                .isNotNull("recycled_at");
     }
 }

@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS `record` (
     `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `deleted`     TINYINT      NOT NULL DEFAULT 0       COMMENT '逻辑删除标记(0-正常,1-删除)',
+    `recycled_at` DATETIME     DEFAULT NULL             COMMENT '进回收站时间(NULL=正常,删除笔记时置值)',
     PRIMARY KEY (`id`),
     KEY `idx_user_record_date` (`user_id`, `record_date`, `deleted`),
     KEY `idx_user_id` (`user_id`)
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS `record` (
 
 -- 已存在的库：本脚本 CREATE TABLE IF NOT EXISTS 不会改已有表结构，需单独执行下面这行
 -- ALTER TABLE `record` ADD COLUMN `title` VARCHAR(128) DEFAULT NULL COMMENT '标题(空=无标题)' AFTER `user_id`;
+-- ALTER TABLE `record` ADD COLUMN `recycled_at` DATETIME DEFAULT NULL COMMENT '进回收站时间(NULL=正常,删除笔记时置值)' AFTER `deleted`;
 
 
 -- ========================================

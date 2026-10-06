@@ -99,7 +99,23 @@
 - 鉴权：是。入参 `?pageNum=&pageSize=&label=`；`label` 空 = 不过滤。出参 `data = { list: RecordVO[], total, pageNum, pageSize, hasNext }`。
 
 ### DELETE /record/{id} — 删除记录
-- 鉴权：是。**物理删除，无回收站，不可恢复**。出参 `R<Void>`。
+- 鉴权：是。**移入回收站**：后端置 `recycledAt`（`recycled_at`），**不删行、不删图片**，图片保留可完整恢复。出参 `R<Void>`。
+- 语义：普通查询（page/getDetail/update）一律排除回收站记录（回收站内记录按「不存在」处理）。彻底删除走 `DELETE /recycle/{id}`。
+
+---
+
+## 回收站（Recycle）— 列表 / 恢复 / 彻底删除已落地
+
+> 前端回收站页面未建，API 层已就绪（light-note `modules/recycle.ts`）。
+
+### GET /recycle/page — 分页查询回收站记录
+- 鉴权：是。入参 `?pageNum=&pageSize=`。出参 `data = { list: RecordVO[], total, pageNum, pageSize, hasNext }`；`list` 元素含 `recycledAt`（进回收站时间），按进回收站时间倒序（最新删除在前）。图片照常换签为访问 URL。
+
+### POST /recycle/restore/{id} — 从回收站恢复记录
+- 鉴权：是。**仅回收站内的记录**（`recycled_at` 非空），否则按「不存在」返回 404。后端置 `recycled_at=null`，图片随记录一并还原（回收时未 detach）。出参 `R<Void>`。
+
+### DELETE /recycle/{id} — 彻底删除回收站记录
+- 鉴权：是。**仅回收站内的记录**（`recycled_at` 非空），否则按「不存在」返回 404。后端置 `deleted=1`（逻辑删除，不可恢复），图片 detach 进入 24h 宽限期后物理清理。出参 `R<Void>`。
 
 ---
 
@@ -164,3 +180,5 @@
 | 日期 | 变更 | 影响 |
 |---|---|---|
 | 2026-10-06 | 初始清单：对齐两端当前代码（auth/user/dict/file/record/report + 过渡接口） | 建立基线 |
+| 2026-10-06 | 记录删除改为移入回收站（新增 `recycled_at`），新增 `DELETE /recycle/{id}` 彻底删除；回收站列表/恢复待开发 | 前端需同步（record.ts 注释 + 删除文案已改） |
+| 2026-10-06 | 回收站落地 `GET /recycle/page` 列表 + `POST /recycle/restore/{id}` 恢复；`RecordVO` 增 `recycledAt` | 前端需同步（types.ts + modules/recycle.ts 已加） |
