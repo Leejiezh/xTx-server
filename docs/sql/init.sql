@@ -153,9 +153,11 @@ INSERT INTO `dict_type` (`id`, `type_code`, `type_name`, `remark`) VALUES
     (1, 'note_label', '笔记标签', '笔记(record)的分类标签')
 ON DUPLICATE KEY UPDATE `type_name` = VALUES(`type_name`);
 
+-- extra 存 { color: { light, dark } }：暗色模式品牌色必须提亮（见 light-note global.scss 的 --brand-500 注释），
+-- 前端 readTagColor 按当前主题取一套，缺省回落令牌。
 INSERT INTO `dict_item` (`id`, `dict_type`, `item_key`, `item_label`, `sort_order`, `extra`) VALUES
-    (1, 'note_label', 'work',   '工作', 10, JSON_OBJECT('color', '#7C3AED')),
-    (2, 'note_label', 'design', '设计', 20, JSON_OBJECT('color', '#EC4899')),
-    (3, 'note_label', 'tech',   '技术', 30, JSON_OBJECT('color', '#3B82F6')),
-    (4, 'note_label', 'life',   '生活', 40, JSON_OBJECT('color', '#F59E0B'))
+    (1, 'note_label', 'work',   '工作', 10, JSON_OBJECT('color', JSON_OBJECT('light', '#7C3AED', 'dark', '#A98BFF'))),
+    (2, 'note_label', 'design', '设计', 20, JSON_OBJECT('color', JSON_OBJECT('light', '#EC4899', 'dark', '#F68EC2'))),
+    (3, 'note_label', 'tech',   '技术', 30, JSON_OBJECT('color', JSON_OBJECT('light', '#3B82F6', 'dark', '#8AB5F9'))),
+    (4, 'note_label', 'life',   '生活', 40, JSON_OBJECT('color', JSON_OBJECT('light', '#F59E0B', 'dark', '#FBBF24')))
 ON DUPLICATE KEY UPDATE `item_label` = VALUES(`item_label`), `extra` = VALUES(`extra`);

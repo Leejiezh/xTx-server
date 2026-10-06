@@ -3,6 +3,7 @@ package com.leejie.xtx.api.controller;
 import cn.hutool.core.util.StrUtil;
 import com.leejie.xtx.common.base.vo.PageResult;
 import com.leejie.xtx.common.result.R;
+import com.leejie.xtx.core.dto.LabelCountVO;
 import com.leejie.xtx.core.dto.RecordCreateReq;
 import com.leejie.xtx.core.dto.RecordQuery;
 import com.leejie.xtx.core.dto.RecordUpdateReq;
@@ -15,6 +16,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 记录表接口。
@@ -65,6 +68,13 @@ public class RecordController {
     public R<Void> delete(@PathVariable Long id) {
         recordService.delete(id);
         return R.ok();
+    }
+
+    /** 当前用户各标签笔记数（不含回收站、未分类不计入；前端「我的」页标签计数 chips 用） */
+    @GetMapping("/label-counts")
+    @Operation(summary = "当前用户各标签笔记数")
+    public R<List<LabelCountVO>> labelCounts() {
+        return R.ok(recordService.countByLabel());
     }
 
 

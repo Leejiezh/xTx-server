@@ -12,4 +12,7 @@ public interface Constants {
     String REDIS_PREFIX = "xtx:";
     String REDIS_TOKEN_KEY = REDIS_PREFIX + "token:";
     String REDIS_WX_SESSION_KEY = REDIS_PREFIX + "wx:session:";
+
+    /** 笔记标签字典类型码（record.label 存的是该字典的 item_key） */
+    String DICT_TYPE_NOTE_LABEL = "note_label";
 }

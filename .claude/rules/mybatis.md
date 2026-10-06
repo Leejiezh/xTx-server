@@ -9,8 +9,9 @@ paths:
 # 数据库与 MyBatis-Plus
 
 ## 查询方式
-- 两张表及以上的关联查询，直接写 SQL（XML 或注解），不要堆一串 MyBatis-Plus 的 Lambda 方法。
 - 单表简单增删改查，使用 MyBatis-Plus 自带方法；条件查询用 `LambdaQueryWrapper`，不要用字符串字段名。
+- 两张表及以上的关联查询，直接写 SQL，不要堆一串 MyBatis-Plus 的 Lambda 方法。
+- **SQL 统一放 XML mapper**（`src/main/resources/mapper/` 下同名 XML，namespace 对齐接口），不在 mapper 接口上用 `@Select`/`@Update` 等注解写 SQL：注解里写不了 resultMap、拆不了 `<sql>` 复用，长 SQL 在注解里可读性差。定制/多表查询一律走 XML。
 - 禁止 `select *`，SQL 中明确列出字段。
 - 禁止在循环中查库，批量操作用 `saveBatch`、`listByIds` 等。
 

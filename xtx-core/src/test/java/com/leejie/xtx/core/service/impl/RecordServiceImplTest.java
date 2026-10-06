@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.leejie.xtx.common.base.query.PageQuery;
 import com.leejie.xtx.common.base.security.CurrentUserProvider;
+import com.leejie.xtx.common.constant.Constants;
 import com.leejie.xtx.common.exception.BusinessException;
+import com.leejie.xtx.core.dto.LabelCountVO;
 import com.leejie.xtx.core.entity.Record;
 import com.leejie.xtx.core.mapper.RecordMapper;
 import com.leejie.xtx.core.service.FileService;
@@ -204,5 +206,24 @@ class RecordServiceImplTest {
         assertEquals(404, assertThrows(BusinessException.class,
                 () -> recordService.restore(RECORD_ID)).getCode());
         verify(recordMapper, never()).update(eq(null), any());
+    }
+
+    @Test
+    @DisplayName("countByLabel 以 note_label 字典为基准统计各标签笔记数")
+    void countByLabel_scopedToCurrentUser() {
+        when(currentUser.currentUserId()).thenReturn(USER_ID);
+        LabelCountVO work = new LabelCountVO();
+        work.setKey("work");
+        work.setLabel("工作");
+        work.setCount(3L);
+        when(recordMapper.countByLabel(USER_ID, Constants.DICT_TYPE_NOTE_LABEL)).thenReturn(List.of(work));
+
+        List<LabelCountVO> result = recordService.countByLabel();
+
+        verify(recordMapper).countByLabel(USER_ID, Constants.DICT_TYPE_NOTE_LABEL);
+        assertEquals(1, result.size());
+        assertEquals("work", result.get(0).getKey());
+        assertEquals("工作", result.get(0).getLabel());
+        assertEquals(3L, result.get(0).getCount());
     }
 }

@@ -3,7 +3,10 @@ package com.leejie.xtx.core.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.leejie.xtx.common.base.query.PageQuery;
 import com.leejie.xtx.common.base.service.OwnedService;
+import com.leejie.xtx.core.dto.LabelCountVO;
 import com.leejie.xtx.core.entity.Record;
+
+import java.util.List;
 
 /**
  * 记录表 服务接口
@@ -24,4 +27,7 @@ public interface RecordService extends OwnedService<Record> {
      * 仅回收站内记录可恢复，否则 404。
      */
     void restore(Long id);
+
+    /** 当前用户各标签笔记数（label 非空、未回收才计入；未分类不计入标签计数） */
+    List<LabelCountVO> countByLabel();
 }

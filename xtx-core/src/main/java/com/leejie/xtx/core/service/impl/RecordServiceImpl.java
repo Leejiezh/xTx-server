@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.leejie.xtx.common.base.query.PageQuery;
 import com.leejie.xtx.common.base.service.impl.OwnedServiceImpl;
+import com.leejie.xtx.common.constant.Constants;
 import com.leejie.xtx.common.exception.BusinessException;
+import com.leejie.xtx.core.dto.LabelCountVO;
 import com.leejie.xtx.core.entity.Record;
 import com.leejie.xtx.core.mapper.RecordMapper;
 import com.leejie.xtx.core.service.FileService;
@@ -166,5 +168,11 @@ public class RecordServiceImpl extends OwnedServiceImpl<RecordMapper, Record> im
                 .eq("user_id", currentUser.currentUserId())
                 .eq("id", id)
                 .isNotNull("recycled_at");
+    }
+
+    /** 当前用户各标签笔记数：归属边界与 OwnedService 一致（userId 取自登录态，不信任入参） */
+    @Override
+    public List<LabelCountVO> countByLabel() {
+        return baseMapper.countByLabel(currentUser.currentUserId(), Constants.DICT_TYPE_NOTE_LABEL);
     }
 }

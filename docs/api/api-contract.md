@@ -98,6 +98,13 @@
 ### GET /record/page — 分页查询记录
 - 鉴权：是。入参 `?pageNum=&pageSize=&label=`；`label` 空 = 不过滤。出参 `data = { list: RecordVO[], total, pageNum, pageSize, hasNext }`。
 
+### GET /record/label-counts — 当前用户各标签笔记数
+- 鉴权：是。无入参。出参 `data` 为**裸数组（不分页）**，以 `note_label` 字典为基准返回**全部启用标签（含 0 笔记）**，按 `sortOrder` 排序：
+  ```json
+  [ { "key": "work", "label": "工作", "extra": { "color": { "light": "#7C3AED", "dark": "#A98BFF" } }, "count": 3 } ]
+  ```
+- 语义：`key` = `dict_item.item_key`（= 首页筛选值）；`label` = 展示名；`extra` = 类型专属属性（含颜色，原样透传）；`count` = 该用户该标签下未回收、未逻辑删除的笔记数（无 = 0）。「我的」页标签计数 chips 走它。
+
 ### DELETE /record/{id} — 删除记录
 - 鉴权：是。**移入回收站**：后端置 `recycledAt`（`recycled_at`），**不删行、不删图片**，图片保留可完整恢复。出参 `R<Void>`。
 - 语义：普通查询（page/getDetail/update）一律排除回收站记录（回收站内记录按「不存在」处理）。彻底删除走 `DELETE /recycle/{id}`。
@@ -146,12 +153,11 @@
 
 ## 过渡接口（后端暂未落地，是否保留待决策）
 
-> 背景：前端最初由 AI 独立生成（基于原型/文档，未结合后端接口设计），这两个接口后端从没实现，当前由 mock 支撑。**是否保留待决策，近期可能清理。**
+> 背景：前端最初由 AI 独立生成（基于原型/文档，未结合后端接口设计），`/search` 后端从没实现，当前由 mock 支撑。**是否保留待决策，近期可能清理。**
 
 | 方法 | 路径 | 前端调用处 | 说明 |
 |---|---|---|---|
 | GET | `/search?q=&tag=&pageNum=&pageSize=` | `src/api/modules/search.ts` | 服务端搜索（返回 `highlights`）。若保留则需后端实现，或并入 `/record` 筛选 |
-| GET | `/tags` | `src/api/modules/tag.ts` | 标签列表 `{ list: [{ name, count }] }`。字典已落地，此接口大概率废弃 |
 
 > 决策结果确定后：保留 → 后端补实现并移入正式接口章节；删除 → 前端删模块 + 移除本清单。
 
@@ -172,7 +178,7 @@
 ## 未冻结字段 / 待确认
 
 - `RecordVO` / `ReportVO` 字段**尚未冻结**，后续 AI 生成接入、搜索落地时可能增删字段。
-- `/search` 与 `/tags` 是否保留待决策（前端 AI 早期生成，后端未实现，见「过渡接口」）。
+- `/search` 是否保留待决策（前端 AI 早期生成，后端未实现，见「过渡接口」）。
 - `/report` 为后续迭代预留，前端暂未接入。
 
 ## 变更记录
@@ -182,3 +188,6 @@
 | 2026-10-06 | 初始清单：对齐两端当前代码（auth/user/dict/file/record/report + 过渡接口） | 建立基线 |
 | 2026-10-06 | 记录删除改为移入回收站（新增 `recycled_at`），新增 `DELETE /recycle/{id}` 彻底删除；回收站列表/恢复待开发 | 前端需同步（record.ts 注释 + 删除文案已改） |
 | 2026-10-06 | 回收站落地 `GET /recycle/page` 列表 + `POST /recycle/restore/{id}` 恢复；`RecordVO` 增 `recycledAt` | 前端需同步（types.ts + modules/recycle.ts 已加） |
+| 2026-10-06 | 新增 `GET /record/label-counts`（当前用户各标签笔记数，`LabelCountVO{label,count}`），「我的」页标签计数 chips 改走它（替代过渡接口 `/tags`） | 前端需同步（types.ts + modules/record.ts + mine.vue 已改） |
+| 2026-10-06 | **删除过渡接口 `GET /tags`**（计数已由 `/record/label-counts` 承接）：前端删 `modules/tag.ts` + mock 路由 + `TagItem` 类型 | 前端已删，两端契约同步 |
+| 2026-10-06 | `GET /record/label-counts` 出参扩为 `{key,label,extra,count}`（含颜色），以字典为基准返回**全部启用标签（含 0 笔记）**按 sortOrder 排序；SQL 移入 `RecordMapper.xml`；`init.sql` 种子色值改为 `{light,dark}` | 前端需同步（types.ts + mine.vue 已改） |

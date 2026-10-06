@@ -2,4 +2,36 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.leejie.xtx.core.mapper.RecordMapper">
 
+    <!-- 标签计数（GET /record/label-counts）
+         以 note_label 字典为基准 LEFT JOIN 当前用户笔记计数：返回全部启用标签（含 0 笔记），按 sortOrder 排序。
+         计数子查询排除回收站（recycled_at IS NULL）与逻辑删除（deleted=0）；
+         原始 SQL 不走 @TableLogic，deleted=0 必须显式写（与 /record/page 过滤口径一致）。
+         extra 是 MySQL JSON 列，用 JsonMapTypeHandler 还原成 Map。 -->
+    <resultMap id="LabelCountMap" type="com.leejie.xtx.core.dto.LabelCountVO">
+        <result property="key" column="item_key"/>
+        <result property="label" column="item_label"/>
+        <result property="extra" column="extra" typeHandler="com.leejie.xtx.core.handler.JsonMapTypeHandler"/>
+        <result property="count" column="cnt"/>
+    </resultMap>
+
+    <select id="countByLabel" resultMap="LabelCountMap">
+        SELECT di.item_key,
+               di.item_label,
+               di.extra,
+               COALESCE(c.cnt, 0) AS cnt
+        FROM dict_item di
+        LEFT JOIN (
+            SELECT r.label, COUNT(*) AS cnt
+            FROM record r
+            WHERE r.user_id = #{userId}
+              AND r.deleted = 0
+              AND r.recycled_at IS NULL
+              AND r.label IS NOT NULL
+            GROUP BY r.label
+        ) c ON c.label = di.item_key
+        WHERE di.dict_type = #{typeCode}
+          AND di.enabled = 1
+        ORDER BY di.sort_order ASC, di.id ASC
+    </select>
+
 </mapper>
