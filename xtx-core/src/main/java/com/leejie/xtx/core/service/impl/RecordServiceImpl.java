@@ -1,5 +1,6 @@
 package com.leejie.xtx.core.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -8,6 +9,7 @@ import com.leejie.xtx.common.base.service.impl.OwnedServiceImpl;
 import com.leejie.xtx.common.constant.Constants;
 import com.leejie.xtx.common.exception.BusinessException;
 import com.leejie.xtx.core.dto.LabelCountVO;
+import com.leejie.xtx.core.dto.SearchQuery;
 import com.leejie.xtx.core.entity.Record;
 import com.leejie.xtx.core.mapper.RecordMapper;
 import com.leejie.xtx.core.service.FileService;
@@ -174,5 +176,18 @@ public class RecordServiceImpl extends OwnedServiceImpl<RecordMapper, Record> im
     @Override
     public List<LabelCountVO> countByLabel() {
         return baseMapper.countByLabel(currentUser.currentUserId(), Constants.DICT_TYPE_NOTE_LABEL);
+    }
+
+    /**
+     * 全文搜索：标题/正文 INSTR 字面子串匹配（utf8mb4_unicode_ci 下不区分大小写），
+     * 不走 LIKE 避免 % / _ 通配符转义，个人笔记量级不建全文索引。
+     * raw SQL 在 RecordMapper.xml：user_id 归属、deleted=0、排除回收站都在 SQL 里显式写，
+     * kw / label 空 = 不过滤；分页由 MP 拦截器按 page 参数自动追加。
+     */
+    @Override
+    public IPage<Record> search(SearchQuery query) {
+        String kw = StrUtil.trimToNull(query.getQ());
+        String label = StrUtil.trimToNull(query.getLabel());
+        return baseMapper.search(query.toPage(), currentUser.currentUserId(), kw, label);
     }
 }

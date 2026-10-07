@@ -2,12 +2,14 @@ package com.leejie.xtx.core.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.leejie.xtx.common.base.query.PageQuery;
 import com.leejie.xtx.common.base.security.CurrentUserProvider;
 import com.leejie.xtx.common.constant.Constants;
 import com.leejie.xtx.common.exception.BusinessException;
 import com.leejie.xtx.core.dto.LabelCountVO;
+import com.leejie.xtx.core.dto.SearchQuery;
 import com.leejie.xtx.core.entity.Record;
 import com.leejie.xtx.core.mapper.RecordMapper;
 import com.leejie.xtx.core.service.FileService;
@@ -24,10 +26,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -142,6 +146,33 @@ class RecordServiceImplTest {
         ArgumentCaptor<QueryWrapper> cap = ArgumentCaptor.forClass(QueryWrapper.class);
         verify(recordMapper).selectPage(any(), cap.capture());
         assertTrue(cap.getValue().getSqlSegment().contains("recycled_at IS NULL"));
+    }
+
+    @Test
+    @DisplayName("search 委托 mapper 原生 SQL：关键词 + 标签 + 当前用户")
+    void search_delegatesToMapper_withKeywordAndLabel() {
+        when(currentUser.currentUserId()).thenReturn(USER_ID);
+        Page<Record> expected = new Page<>();
+        when(recordMapper.search(any(), eq(USER_ID), eq("MySQL"), eq("work"))).thenReturn(expected);
+
+        SearchQuery query = new SearchQuery();
+        query.setQ("MySQL");
+        query.setLabel("work");
+        IPage<Record> result = recordService.search(query);
+
+        assertSame(expected, result);
+        verify(recordMapper).search(any(), eq(USER_ID), eq("MySQL"), eq("work"));
+    }
+
+    @Test
+    @DisplayName("search 空关键词/标签 → 传 null，不加过滤条件")
+    void search_blankKeyword_passesNull() {
+        when(currentUser.currentUserId()).thenReturn(USER_ID);
+        when(recordMapper.search(any(), eq(USER_ID), isNull(), isNull())).thenReturn(new Page<>());
+
+        recordService.search(new SearchQuery());
+
+        verify(recordMapper).search(any(), eq(USER_ID), isNull(), isNull());
     }
 
     @Test

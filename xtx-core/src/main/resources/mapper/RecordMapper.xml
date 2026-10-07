@@ -34,4 +34,25 @@
         ORDER BY di.sort_order ASC, di.id ASC
     </select>
 
+    <!-- 搜索（GET /search）：标题/正文 INSTR 字面子串匹配 + label 过滤，按 id 倒序。
+         原始 SQL 不走 @TableLogic / OwnedService，user_id 归属、deleted=0、排除回收站
+         必须显式写（口径与 /record/page 一致）；kw / label 空 = 不过滤。
+         分页由 MyBatis-Plus 拦截器按第一个 IPage 参数自动生成 count + limit，这里不写。
+         resultMap 引用实体的 autoResultMap（@TableName(autoResultMap=true)），
+         images JSON 列才走 JsonListTypeHandler 反序列化成 List< >。 -->
+    <select id="search" resultType="com.leejie.xtx.core.entity.Record">
+        SELECT id, user_id, title, label, content, images, record_date, created_at, updated_at, recycled_at
+        FROM record
+        WHERE user_id = #{userId}
+          AND deleted = 0
+          AND recycled_at IS NULL
+          <if test="kw != null and kw != ''">
+              AND (INSTR(title, #{kw}) &gt; 0 OR INSTR(content, #{kw}) &gt; 0)
+          </if>
+          <if test="label != null and label != ''">
+              AND label = #{label}
+          </if>
+        ORDER BY id DESC
+    </select>
+
 </mapper>

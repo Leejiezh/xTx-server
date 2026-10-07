@@ -126,6 +126,31 @@
 
 ---
 
+## 笔记搜索（Search）— 已落地
+
+### GET /search — 分页搜索笔记（标题 + 正文子串匹配）
+- 鉴权：是。入参 `?q=&label=&pageNum=&pageSize=`：
+  - `q`：关键词，标题/正文**不区分大小写**子串匹配（`INSTR`，utf8mb4_unicode_ci 排序规则）；空 = 不过滤。
+  - `label`：标签过滤（`dict_item.item_key`），空 = 不过滤。
+- 出参 `data = { list: SearchVO[], total, pageNum, pageSize, hasNext }`。
+- `SearchVO`（元素）：
+  ```json
+  {
+    "id": "100", "title": "MySQL 笔记", "label": "work",
+    "recordDate": "2026-10-06", "createdAt": "<ISO>", "updatedAt": "<ISO>",
+    "excerpt": "…MySQL 8.0 使用 ngram…",
+    "highlights": { "title": "<span class=\"hl\">MySQL</span> 笔记", "excerpt": "…<span class=\"hl\">MySQL</span>…" }
+  }
+  ```
+- 语义：
+  - 搜索范围：当前用户**未回收、未逻辑删除**的记录，按 id 倒序（最新创建在前）。
+  - `excerpt`：围绕**首个命中**的纯文本摘要（≤60 字，越界补 `…`）；正文未命中时退化为开头窗口。
+  - `highlights`：服务端生成——**先 HTML 转义原文，再把命中段包 `<span class="hl">`**，前端 rich-text 只渲染这一个标签，不自行拼接。
+  - **不返回** `content` / `images`（结果卡片只展示标题+摘要，省一次图片换签；正文看详情接口）。
+  - 实现：MySQL `INSTR` 字面子串匹配，个人笔记量级不建全文索引；单字可搜。
+
+---
+
 ## 报告（Report）
 
 > **后续迭代预留**：AI 基于笔记生成报告（日记/周记/学习总结/复盘）的接口。前端暂未接入，先按后端实况记录，正式设计时再定。
@@ -151,18 +176,6 @@
 
 ---
 
-## 过渡接口（后端暂未落地，是否保留待决策）
-
-> 背景：前端最初由 AI 独立生成（基于原型/文档，未结合后端接口设计），`/search` 后端从没实现，当前由 mock 支撑。**是否保留待决策，近期可能清理。**
-
-| 方法 | 路径 | 前端调用处 | 说明 |
-|---|---|---|---|
-| GET | `/search?q=&tag=&pageNum=&pageSize=` | `src/api/modules/search.ts` | 服务端搜索（返回 `highlights`）。若保留则需后端实现，或并入 `/record` 筛选 |
-
-> 决策结果确定后：保留 → 后端补实现并移入正式接口章节；删除 → 前端删模块 + 移除本清单。
-
----
-
 ## 数据模型速查（字段 = camelCase）
 
 - `LoginVO`：`token`、`userInfo`(UserVO)
@@ -171,14 +184,14 @@
 - `PresignResp`：`postUrl`、`formData`、`objectKey`、`expiresAt`
 - `UploadResp`：`objectKey`、`originalFilename`、`contentType`、`size`
 - `RecordVO`：`id`(string)、`title`、`label`、`content`、`images`(访问 URL[])、`recordDate`、`createdAt`、`updatedAt`
+- `SearchVO`：`id`(string)、`title`、`label`、`recordDate`、`createdAt`、`updatedAt`、`excerpt`、`highlights{title,excerpt}`
 - `ReportVO`：`id`(string)、`template`、`title`、`content`、`startDate`、`endDate`、`category`、`recordCount`、`model`、`tokensUsed`
 
 前端类型对应文件：`src/api/types.ts`（手写，无 codegen；后端改字段时同一次改动内同步）。
 
 ## 未冻结字段 / 待确认
 
-- `RecordVO` / `ReportVO` 字段**尚未冻结**，后续 AI 生成接入、搜索落地时可能增删字段。
-- `/search` 是否保留待决策（前端 AI 早期生成，后端未实现，见「过渡接口」）。
+- `RecordVO` / `ReportVO` 字段**尚未冻结**，后续 AI 生成接入时可能增删字段。
 - `/report` 为后续迭代预留，前端暂未接入。
 
 ## 变更记录
@@ -191,3 +204,4 @@
 | 2026-10-06 | 新增 `GET /record/label-counts`（当前用户各标签笔记数，`LabelCountVO{label,count}`），「我的」页标签计数 chips 改走它（替代过渡接口 `/tags`） | 前端需同步（types.ts + modules/record.ts + mine.vue 已改） |
 | 2026-10-06 | **删除过渡接口 `GET /tags`**（计数已由 `/record/label-counts` 承接）：前端删 `modules/tag.ts` + mock 路由 + `TagItem` 类型 | 前端已删，两端契约同步 |
 | 2026-10-06 | `GET /record/label-counts` 出参扩为 `{key,label,extra,count}`（含颜色），以字典为基准返回**全部启用标签（含 0 笔记）**按 sortOrder 排序；SQL 移入 `RecordMapper.xml`；`init.sql` 种子色值改为 `{light,dark}` | 前端需同步（types.ts + mine.vue 已改） |
+| 2026-10-06 | **落地笔记搜索 `GET /search`**：`q`（标题/正文 INSTR 子串匹配，不区分大小写）+ `label` 过滤，返回 `SearchVO`（命中窗口摘要 + 服务端高亮，不含 content/images）；**参数 `tag` 更名 `label`**；`/search` 从「过渡接口」移入正式章节 | 后端 SearchController + RecordService.search + SearchHighlightUtil；前端需同步（types.ts / search.ts / mock / search.vue） |
